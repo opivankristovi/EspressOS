@@ -1,0 +1,40 @@
+{
+ "version": 1,
+ "cycleMs": 10,
+ "devices": [
+  {"id": 1, "driver": "BME280", "name": "Greenhouse", "addr": 118, "poll": 2},
+  {"id": 2, "driver": "BH1750", "name": "Sunlight", "addr": 35, "poll": 1}
+ ],
+ "blocks": [
+  {"id": 1, "type": "SENSOR", "x": 40, "y": 40, "p": {"dev": 1, "ch": 0}, "note": "Air temp"},
+  {"id": 2, "type": "THRESH", "x": 220, "y": 40, "p": {"on": 26, "off": 24}, "note": "Too warm"},
+  {"id": 3, "type": "AND", "x": 400, "y": 40, "p": {}},
+  {"id": 4, "type": "VIN", "ui": "VSWITCH", "x": 40, "y": 140, "p": {"idx": 0, "mode": "switch", "name": "Auto vent"}},
+  {"id": 5, "type": "DO", "x": 580, "y": 60, "p": {"pin": 26, "inv": 1}, "note": "Vent fan"},
+
+  {"id": 6, "type": "SENSOR", "x": 40, "y": 260, "p": {"dev": 1, "ch": 1}, "note": "Humidity"},
+  {"id": 7, "type": "CMP", "x": 220, "y": 260, "p": {"op": "<", "b": 40}, "note": "Too dry"},
+  {"id": 8, "type": "OR", "x": 400, "y": 260, "p": {}},
+  {"id": 9, "type": "VIN", "ui": "VSWITCH", "x": 40, "y": 360, "p": {"idx": 1, "mode": "button", "name": "Mist now"}},
+  {"id": 10, "type": "DO", "x": 580, "y": 280, "p": {"pin": 27, "inv": 0}, "note": "Mister valve"},
+
+  {"id": 11, "type": "WEEK", "x": 40, "y": 480, "p": {"days": 127, "on": 1140, "off": 420}, "note": "Night"},
+  {"id": 12, "type": "DO", "x": 580, "y": 480, "p": {"pin": 25, "inv": 0}, "note": "Path lights"},
+
+  {"id": 13, "type": "DI", "x": 40, "y": 590, "p": {"pin": 4, "pull": 1, "inv": 1}, "note": "Door open"},
+  {"id": 14, "type": "TON", "x": 220, "y": 590, "p": {"t": 5}, "note": "Left open"},
+  {"id": 15, "type": "BLINK", "x": 400, "y": 590, "p": {"on": 0.5, "off": 0.5}},
+  {"id": 16, "type": "DO", "x": 580, "y": 590, "p": {"pin": 14, "inv": 0}, "note": "Alarm lamp"},
+
+  {"id": 17, "type": "SENSOR", "x": 40, "y": 700, "p": {"dev": 2, "ch": 0}, "note": "Sunlight"},
+  {"id": 18, "type": "SCALE", "x": 220, "y": 700, "p": {"inMin": 0, "inMax": 800, "outMin": 100, "outMax": 0, "clamp": 1}, "note": "Top up"},
+  {"id": 19, "type": "AO", "x": 580, "y": 700, "p": {"pin": 33, "freq": 1000}, "note": "Grow light"}
+ ],
+ "wires": [
+  [1, 0, 2, 0], [2, 0, 3, 0], [4, 0, 3, 1], [3, 0, 5, 0],
+  [6, 0, 7, 0], [7, 0, 8, 0], [9, 0, 8, 1], [8, 0, 10, 0],
+  [11, 0, 12, 0],
+  [13, 0, 14, 0], [14, 0, 15, 0], [15, 0, 16, 0],
+  [17, 0, 18, 0], [18, 0, 19, 0]
+ ]
+}

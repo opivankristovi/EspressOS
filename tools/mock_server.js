@@ -19,7 +19,7 @@ class MockHal extends NullHal {
   readSensor(dev, ch) {
     const d = devices.find((x) => x.id === dev);
     if (!d) return { ok: false, v: 0 };
-    const base = { BME280: [21, 50, 1013], SHT31: [21, 50], BH1750: [300], ADS1115: [1, 2, 3, 0.5], DS18B20: [18], I2C_GENERIC: [42] }[d.driver] || [0];
+    const base = { BME280: [25.5, 38, 1013], SHT31: [21, 50], BH1750: [300], ADS1115: [1, 2, 3, 0.5], DS18B20: [18], I2C_GENERIC: [42] }[d.driver] || [0];
     return { ok: true, v: base[ch] + Math.sin(Date.now() / 7000 + ch) * 3 };
   }
   timeOfDay() { const d = new Date(); return { dow: d.getDay(), m: d.getHours() * 60 + d.getMinutes() }; }

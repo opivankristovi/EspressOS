@@ -1,15 +1,71 @@
 # EspressOS
 
-A LOGO!-style logic controller for the ESP32. Flash it once over USB. After that you build programs in a web page the board serves itself: drag function blocks onto a sheet, wire them together, press **Deploy**, and watch signals light up live. You don't need the Arduino IDE or anything else installed on your computer.
+**Turn a $5 ESP32 into a little PLC you program by drag and drop, straight from your browser.**
 
-## Features
+Remember Siemens LOGO!? You drop AND gates, timers and counters on a sheet, draw wires, press a button, and your relays start doing things. EspressOS brings that to the ESP32. Flash it once over USB and the board serves its own editor over Wi-Fi. There's nothing to install, no Arduino IDE, and no compile-and-upload loop. Open `http://espressos.local`, wire up your logic, press **Deploy**, and watch it run live.
 
-- **Block editor in the browser.** Drag blocks from the palette, wire an output (right side) to an input (left side), then edit the block's settings in the side panel. Supports undo/redo, duplicate, zoom and pan. Drafts are saved in the browser.
-- **Blocks:** digital in/out, analog in, PWM out, constant, web switch / push button / setpoint, AND, OR, NOT, NAND, NOR, XOR, SR latch, edge detect, on-delay, off-delay, pulse, blinker, weekly timer (NTP), up/down counter, compare, threshold with hysteresis, math, scale, select.
-- **Sensors:** BME280, SHT3x, BH1750, ADS1115, DS18B20, plus a *generic I²C register* reader (address, register, byte count, endianness, scale and offset) for chips without a driver. An I²C bus scan suggests which driver fits each address it finds.
-- **Live view:** digital wires turn green when high, analog values appear next to ports, and timers show elapsed time. The **Live** panel has your web switches and setpoints, output lamps and sensor readings.
-- **Simulator:** with no board connected (or with `?sim` in the URL), the same engine runs in your browser. Click digital-input blocks to toggle them.
-- **Board features:** setup access point with a captive portal on first boot, mDNS (`espressos.local`), optional admin password, run/stop, and firmware or web-UI updates from the browser (OTA). Outputs are released to a safe state on stop or redeploy.
+![EspressOS editor showing a greenhouse controller running live, with lit blocks, green wires and sensor readings](docs/screenshots/editor-live-dark.png)
+
+<sub>A greenhouse controller running live: temperature opens the vent, low humidity opens the mister, a night timer runs the path lights, and the grow light dims as sunlight increases.</sub>
+
+## Why you'll like it
+
+- **Programs in minutes, not compile cycles.** Changes take effect the moment you press Deploy. A bad program is rejected and the old one keeps running.
+- **See your logic think.** Wires glow green when high, analog values ride along the wires, and timers count down inside their blocks, just like LOGO!'s online test.
+- **Sensors without code.** Scan the I²C bus, click the BME280 it found, and drop a *Sensor value* block. Temperature, humidity, pressure, light, voltage and 1-Wire temperature work out of the box. A *generic I²C register* reader covers many other chips.
+- **A control panel for free.** Add web switches, push buttons and setpoints to your program, and they show up as controls on the Live panel, from any phone on your network.
+- **Try it before you solder.** With no board connected, the same engine runs as a simulator in your browser. Click inputs to toggle them and watch the outputs respond.
+- **Built like a controller, not a toy.** Fixed 10 ms scan cycle on its own CPU core, outputs released to a safe state on stop or redeploy, a watchdog, and the program kept in flash across power cycles.
+- **Updates over the air.** New firmware or web UI uploads from the Settings page.
+
+<table>
+<tr>
+<td width="68%"><img src="docs/screenshots/editor-light.png" alt="Light theme editor with the Threshold block selected and its settings in the side panel"></td>
+<td width="32%"><img src="docs/screenshots/phone-live.png" alt="Live panel with a toggle switch, push button, output lamps and sensor readings"></td>
+</tr>
+<tr>
+<td><sub>Click any block to tune it: thresholds, delays, pins, names. Light and dark themes follow your system.</sub></td>
+<td><sub>The Live panel: switches, buttons, output lamps and sensor values.</sub></td>
+</tr>
+</table>
+
+## The block library
+
+| Category | Blocks |
+|---|---|
+| **Inputs & outputs** | Digital input, digital output (with active-low option), analog input, PWM output, constant, web switch / push button, web setpoint |
+| **Logic** | AND, OR, NOT, NAND, NOR, XOR, SR latch, edge detect |
+| **Timers & counters** | On-delay, off-delay, pulse, blinker, weekly timer (NTP clock), up/down counter |
+| **Analog** | Compare, threshold with hysteresis, math (+ − × ÷ min max), scale, select |
+| **Sensors** | BME280, SHT3x, BH1750, ADS1115, DS18B20, generic I²C register |
+
+![Sensors page after an I²C scan, showing two configured sensors with live readings](docs/screenshots/sensors.png)
+
+## Get started
+
+**Just curious?** Clone the repo and run the editor against a simulated board, no hardware needed:
+
+```bash
+npm run mock
+```
+
+Then open http://localhost:8080 and import [`examples/greenhouse.json`](examples/greenhouse.json) from **Settings → Import**, or open http://localhost:8080/?sim for the in-browser simulator.
+
+**Have an ESP32?** You need [PlatformIO](https://platformio.org/) (`pip install platformio`) and an ESP32 dev board (ESP32-WROOM, 4 MB).
+
+```bash
+python tools/build_web.py
+```
+
+```bash
+cd firmware && pio run -t upload && pio run -t uploadfs
+```
+
+1. The board starts a Wi-Fi network called `EspressOS-XXXX`. Join it and the setup page opens (or browse to `192.168.4.1`).
+2. Under **Settings**, enter your Wi-Fi details, save, and reboot.
+3. Open `http://espressos.local` and start dragging blocks.
+
+Pin notes: I²C defaults to SDA 21 / SCL 22 (changeable in Settings). GPIO 6–11 are never offered because they're wired to flash. GPIO 34–39 are input-only. Analog inputs use ADC1 pins, since ADC2 is unavailable while Wi-Fi is on.
 
 ## How it works
 
@@ -22,45 +78,27 @@ Browser ──HTTP/WebSocket──► ESP32
                                └─ sensor task (core 0): polls sensors, caches values
 ```
 
-A program is plain JSON: blocks, wires `[fromId, fromPort, toId, toPort]` and sensor devices. On deploy the board validates the program and sorts the blocks so each one runs after its inputs. If a program is rejected, the old one keeps running. Feedback loops are allowed and read the previous cycle's value, as on a PLC.
+A program is plain JSON: blocks, wires `[fromId, fromPort, toId, toPort]` and sensor devices. You can version it in git or share it like the [greenhouse example](examples/greenhouse.json). On deploy the board validates it and sorts the blocks so each runs after its inputs. Feedback loops are allowed and read the previous cycle's value, as on a PLC.
 
-**Adding a sensor library:** the ESP32 can't compile code itself, so sensor drivers are built into the firmware. For a chip that isn't in the list, use the generic I²C block. To add a native driver, add a class in `firmware/src/Sensors.cpp`, add its entry to `DRIVERS` in `web/js/catalog.js`, rebuild, and upload `firmware.bin` from **Settings → Firmware update**. You never need the IDE on the board side.
-
-## First flash
-
-Requires [PlatformIO](https://platformio.org/) (`pip install platformio`) and an ESP32 dev board (ESP32-WROOM, 4 MB).
-
-```bash
-python tools/build_web.py
-```
-
-```bash
-cd firmware && pio run -t upload && pio run -t uploadfs
-```
-
-1. The board starts an access point called `EspressOS-XXXX`. Join it and the setup page opens (or browse to `192.168.4.1`).
-2. Under **Settings**, enter your Wi-Fi details, save, and reboot.
-3. Open `http://espressos.local` (or the IP shown on the serial monitor at 115200 baud).
-
-Default pins: I²C SDA 21 / SCL 22 (changeable in Settings). GPIO 6–11 are never offered because they're wired to flash. GPIO 34–39 are input-only. Analog inputs are limited to ADC1 pins, since ADC2 doesn't work while Wi-Fi is on.
+**Adding a sensor driver.** The ESP32 can't compile code itself, so drivers are built into the firmware. To add one, write a small class in `firmware/src/Sensors.cpp`, list it in `DRIVERS` in `web/js/catalog.js`, rebuild, and upload `firmware.bin` from **Settings → Firmware update**. Until then, the generic I²C block handles many simple chips.
 
 ## Development
 
 | What | Command |
 |---|---|
-| UI against a fake board (no hardware) | `npm run mock`, then open http://localhost:8080 |
-| UI in pure simulator mode | open http://localhost:8080/?sim |
+| Editor against a fake board | `npm run mock`, then open http://localhost:8080 |
+| Pure simulator | open http://localhost:8080/?sim |
 | JS engine tests | `npm test` |
 | C++ engine tests | `cd firmware && pio test -e native` (needs a host g++) |
-| Bundle UI for the board | `npm run build:web` |
+| Bundle the UI for the board | `npm run build:web` |
 
-The engine exists twice: `firmware/lib/engine` (C++) and `web/js/sim.js` (JS, for the simulator). Both have the same test cases. `tools/test_sim.js` also checks that the block tables in `Blocks.cpp`, `sim.js` and `catalog.js` agree.
+The engine is implemented twice: in C++ for the board (`firmware/lib/engine`) and in JS for the simulator (`web/js/sim.js`). Both run the same test cases, and `tools/test_sim.js` checks that the block tables in `Blocks.cpp`, `sim.js` and `catalog.js` stay in sync.
 
 ## Status
 
-Tested: C++ engine (12 unit tests), JS engine (14 tests), the full editor flow in a browser against the mock board and simulator, and the firmware build (1.54 MB of the 1.9 MB app slot). **Not yet run on a real ESP32**, so the Wi-Fi/AP portal, OTA, and sensor drivers have only been compiled, not tested on hardware.
+EspressOS is young. The C++ engine (12 tests), JS engine (14 tests), the complete editor flow (against the mock board and the simulator) and the firmware build (1.54 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
 
-Ideas for later: Modbus RTU and UART blocks, an MQTT/HTTP output block, a CI build that publishes ready-to-upload `.bin` files, and retentive (power-fail-safe) counters.
+On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 
 ## License
 

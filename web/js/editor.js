@@ -151,8 +151,9 @@
         const { w, h } = this.size(b);
         x0 = Math.min(x0, b.x - 30); y0 = Math.min(y0, b.y - 20); x1 = Math.max(x1, b.x + w + 50); y1 = Math.max(y1, b.y + h + 20);
       }
-      const s = Math.min(1.4, Math.max(0.3, Math.min(r.width / (x1 - x0), r.height / (y1 - y0))));
-      this.view = { s, x: (r.width - (x1 - x0) * s) / 2 - x0 * s, y: (r.height - (y1 - y0) * s) / 2 - y0 * s };
+      const H = r.height - 56;  // keep clear of the floating toolbar at the bottom
+      const s = Math.min(1.4, Math.max(0.3, Math.min(r.width / (x1 - x0), H / (y1 - y0))));
+      this.view = { s, x: (r.width - (x1 - x0) * s) / 2 - x0 * s, y: (H - (y1 - y0) * s) / 2 - y0 * s };
       this.applyView();
     }
     centerWorld() {
@@ -207,7 +208,7 @@
       const sym = el('text', { class: 'sym', x: w / 2, y: bodyMid }, g);
       sym.textContent = d.sym;
       const sumText = this.opts.summary(b, d);
-      if (sumText) { const s = el('text', { class: 'sum', x: w / 2, y: h - 8 }, g); s.textContent = sumText.length > 18 ? sumText.slice(0, 17) + '…' : sumText; this.refs.sums[b.id] = s; }
+      if (sumText) { const s = el('text', { class: 'sum', x: w / 2, y: h - 8 }, g); s.textContent = sumText.length > 16 ? sumText.slice(0, 15) + '…' : sumText; this.refs.sums[b.id] = s; }
       const ex = el('text', { class: 'extra', x: w / 2, y: h - 8 }, g);
       this.refs.extras[b.id] = ex;
 
