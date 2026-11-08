@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mock-board",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/mock_server.js", "8080"],
+      "port": 8080
+    }
+  ]
+}
