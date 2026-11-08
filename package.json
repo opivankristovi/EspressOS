@@ -2,6 +2,7 @@
   "name": "espressos",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "LOGO!-style block logic controller for the ESP32, programmed from its own web page",
   "scripts": {
     "test": "node --test tools/test_sim.js",

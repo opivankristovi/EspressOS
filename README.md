@@ -61,3 +61,7 @@ The engine exists twice: `firmware/lib/engine` (C++) and `web/js/sim.js` (JS, fo
 Tested: C++ engine (12 unit tests), JS engine (14 tests), the full editor flow in a browser against the mock board and simulator, and the firmware build (1.54 MB of the 1.9 MB app slot). **Not yet run on a real ESP32**, so the Wi-Fi/AP portal, OTA, and sensor drivers have only been compiled, not tested on hardware.
 
 Ideas for later: Modbus RTU and UART blocks, an MQTT/HTTP output block, a CI build that publishes ready-to-upload `.bin` files, and retentive (power-fail-safe) counters.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
