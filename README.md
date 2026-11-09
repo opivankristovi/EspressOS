@@ -123,7 +123,9 @@ When importing a file from another tool:
 Limits:
 - OpenPLC sets ESP32 pins per board, so after exporting, copy the I/O table the export shows into OpenPLC's board settings.
 - Sensors and the weekly timer's clock have no IEC equivalent. They're exported as variables you feed from your PLC (`CLOCK_DOW` / `CLOCK_MINUTE`, `S_…`).
-- Exports are validated against the official PLCopen schema, but haven't yet been compiled with OpenPLC's `matiec` compiler. Please report anything it rejects.
+- Inverted digital inputs and outputs are exported as `NOT` blocks, because OpenPLC ignores inversion marks on variables. EspressOS folds them back in when you re-import.
+
+Every push runs the [IEC compile check](.github/workflows/iec.yml) on GitHub Actions. It exports the [examples](examples/), converts them to Structured Text with OpenPLC Editor's own generator, and compiles the result with OpenPLC's `matiec` compiler and `gcc`, exactly as OpenPLC does before uploading to a board. The exports also validate against the official PLCopen schema.
 
 ## Development
 
@@ -134,12 +136,14 @@ Limits:
 | JS engine + PLCopen tests | `npm test` (set `PLCOPEN_XSD` to OpenPLC/Beremiz's `tc6_xml_v201.xsd` and install `lxml` to also validate exports against the schema) |
 | C++ engine tests | `cd firmware && pio test -e native` (needs a host g++) |
 | Bundle the UI for the board | `npm run build:web` |
+| Export programs to PLCopen XML | `node tools/export_plcopen.js <out-dir> examples/*.json` |
+| Compile exports with OpenPLC's toolchain | runs in CI ([`iec.yml`](.github/workflows/iec.yml)): OpenPLC Editor's ST generator, then `matiec` and `gcc` |
 
 The engine is implemented twice: in C++ for the board (`firmware/lib/engine`) and in JS for the simulator (`web/js/sim.js`). Both run the same test cases, and `tools/test_sim.js` checks that the block tables in `Blocks.cpp`, `sim.js` and `catalog.js` stay in sync.
 
 ## Status
 
-EspressOS is young. A self-review found 18 issues across security, controller behaviour and the interface, and all have been fixed. The C++ engine (14 tests), JS engine (16 tests), PLCopen import/export (7 tests, including schema validation and checking that a program behaves the same after export and re-import), the complete editor flow (against the mock board and the simulator) and the firmware build (1.55 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
+EspressOS is young. A self-review found 18 issues across security, controller behaviour and the interface, and all have been fixed. The C++ engine (14 tests), JS engine (16 tests), PLCopen import/export (7 tests, including schema validation and checking that a program behaves the same after export and re-import, plus a CI job that compiles the exports with OpenPLC's `matiec`), the complete editor flow (against the mock board and the simulator) and the firmware build (1.55 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
 
 On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 
