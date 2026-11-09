@@ -1,3 +1,4 @@
 firmware/.pio/
 firmware/data/
 node_modules/
+build/

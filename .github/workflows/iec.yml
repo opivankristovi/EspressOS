@@ -1,0 +1,74 @@
+name: IEC 61131-3 compile check
+
+# Exports the example programs to PLCopen XML, converts them to Structured Text
+# with OpenPLC Editor's generator and compiles them with matiec (iec2c) and gcc,
+# the same toolchain OpenPLC uses. Fails if any step rejects an export.
+
+on:
+  push:
+    paths: ['web/js/plcopen.js', 'web/js/sim.js', 'examples/**', 'tools/export_plcopen.js', 'tools/plcopen_to_st.py', '.github/workflows/iec.yml']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  MATIEC_REF: 75d6e82cce5bc8b98ce03a417b106884cbb7ebb5   # thiagoralves/matiec (OpenPLC's fork)
+  EDITOR_REF: 6a8e930a914e4421e8fa05966b31eb371b439243   # thiagoralves/editor (OpenPLC Editor)
+
+jobs:
+  matiec:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends flex bison autoconf automake libtool python3-lxml
+
+      - name: Fetch matiec and OpenPLC Editor
+        run: |
+          for r in "matiec $MATIEC_REF" "editor $EDITOR_REF"; do
+            set -- $r
+            git init -q "../$1" && git -C "../$1" fetch -q --depth 1 "https://github.com/thiagoralves/$1.git" "$2" && git -C "../$1" checkout -q FETCH_HEAD
+          done
+
+      - name: Cache iec2c
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ../matiec-bin
+          key: iec2c-${{ env.MATIEC_REF }}
+
+      - name: Build iec2c
+        if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: ../matiec
+        run: autoreconf -i && ./configure && make -j"$(nproc)" iec2c && mkdir -p ../matiec-bin && cp iec2c ../matiec-bin/
+
+      - name: Export examples to PLCopen XML
+        run: node tools/export_plcopen.js build/iec examples/*.json
+
+      - name: PLCopen XML -> Structured Text (OpenPLC Editor generator)
+        run: for f in build/iec/*.xml; do python3 tools/plcopen_to_st.py ../editor "$f" "${f%.xml}.st"; done
+
+      - name: Structured Text -> C (matiec, OpenPLC runtime flags)
+        run: |
+          for f in build/iec/*.st; do
+            out="${f%.st}"; mkdir -p "$out"
+            echo "::group::$f"; cat -n "$f"; echo "::endgroup::"
+            ../matiec-bin/iec2c -f -l -p -r -R -a -I ../matiec/lib -T "$out" "$f"
+          done
+
+      - name: Compile generated C (gcc)
+        run: |
+          for d in build/iec/*/; do
+            echo "== $d"
+            gcc -c -w -I ../matiec/lib/C -I "$d" "$d/Config0.c" -o "$d/Config0.o"
+            gcc -c -w -I ../matiec/lib/C -I "$d" "$d/Res0.c" -o "$d/Res0.o"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iec-build
+          path: build/iec

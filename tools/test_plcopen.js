@@ -13,62 +13,8 @@ const { Engine, NullHal } = require('../web/js/sim.js');
 const greenhouse = require('../examples/greenhouse.json');
 
 // Every block type, inverted I/O, a feedback loop, analog and digital paths.
-const allBlocks = {
-  version: 1, cycleMs: 20,
-  devices: [{ id: 1, driver: 'SHT31', name: 'Room', addr: 68, poll: 2 }],
-  blocks: [
-    { id: 1, type: 'DI', x: 40, y: 40, p: { pin: 4, pull: 1, inv: 0 }, note: 'Button A' },
-    { id: 2, type: 'DI', x: 40, y: 120, p: { pin: 5, pull: 1, inv: 1 }, note: 'Button B' },
-    { id: 3, type: 'VIN', ui: 'VSWITCH', x: 40, y: 200, p: { idx: 0, mode: 'switch', name: 'Enable' } },
-    { id: 4, type: 'VIN', ui: 'VSLIDER', x: 40, y: 280, p: { idx: 1, min: 0, max: 100, step: 1, name: 'Set' } },
-    { id: 5, type: 'AI', x: 40, y: 360, p: { pin: 34, min: 0, max: 50 } },
-    { id: 6, type: 'SENSOR', x: 40, y: 440, p: { dev: 1, ch: 0 } },
-    { id: 7, type: 'CONST', x: 40, y: 520, p: { value: 2.5 } },
-    { id: 10, type: 'AND', x: 220, y: 40, p: {} },
-    { id: 11, type: 'OR', x: 220, y: 160, p: {} },
-    { id: 12, type: 'XOR', x: 220, y: 280, p: {} },
-    { id: 13, type: 'NAND', x: 220, y: 400, p: {} },
-    { id: 14, type: 'NOR', x: 220, y: 520, p: {} },
-    { id: 15, type: 'NOT', x: 220, y: 640, p: {} },
-    { id: 16, type: 'SR', x: 400, y: 40, p: { prio: 'R' } },
-    { id: 17, type: 'SR', x: 400, y: 140, p: { prio: 'S' } },
-    { id: 18, type: 'EDGE', x: 400, y: 240, p: {} },
-    { id: 19, type: 'TON', x: 400, y: 340, p: { t: 0.3 } },
-    { id: 20, type: 'TOF', x: 400, y: 440, p: { t: 0.2 } },
-    { id: 21, type: 'TP', x: 400, y: 540, p: { t: 0.25 } },
-    { id: 22, type: 'BLINK', x: 400, y: 640, p: { on: 0.1, off: 0.15 } },
-    { id: 23, type: 'CTR', x: 580, y: 40, p: { preset: 3 } },
-    { id: 24, type: 'CMP', x: 580, y: 160, p: { op: '>=', b: 20 } },
-    { id: 25, type: 'THRESH', x: 580, y: 260, p: { on: 30, off: 20 } },
-    { id: 26, type: 'MATH', x: 580, y: 360, p: { op: '*', b: 0 } },
-    { id: 27, type: 'SCALE', x: 580, y: 460, p: { inMin: 0, inMax: 100, outMin: 100, outMax: 0, clamp: 1 } },
-    { id: 28, type: 'SEL', x: 580, y: 560, p: {} },
-    { id: 29, type: 'MATH', x: 580, y: 660, p: { op: 'max', b: 0 } },
-    { id: 30, type: 'NOT', x: 760, y: 660, p: {}, note: 'Toggle' },
-    { id: 40, type: 'DO', x: 760, y: 40, p: { pin: 16, inv: 0 } },
-    { id: 41, type: 'DO', x: 760, y: 140, p: { pin: 17, inv: 1 } },
-    { id: 42, type: 'AO', x: 760, y: 240, p: { pin: 25, freq: 1000 } },
-    { id: 43, type: 'DO', x: 760, y: 340, p: { pin: 18, inv: 0 } },
-  ],
-  wires: [
-    [1, 0, 10, 0], [2, 0, 10, 1], [3, 0, 10, 2],
-    [1, 0, 11, 0], [2, 0, 11, 1],
-    [1, 0, 12, 0], [2, 0, 12, 1], [3, 0, 12, 2],
-    [1, 0, 13, 0], [3, 0, 13, 1],
-    [2, 0, 14, 0],
-    [10, 0, 15, 0],
-    [1, 0, 16, 0], [2, 0, 16, 1],
-    [1, 0, 17, 0], [2, 0, 17, 1],
-    [1, 0, 18, 0],
-    [11, 0, 19, 0], [12, 0, 20, 0], [18, 0, 21, 0], [3, 0, 22, 0],
-    [18, 0, 23, 0], [18, 1, 23, 1], [2, 0, 23, 2],
-    [5, 0, 24, 0], [6, 0, 25, 0], [4, 0, 26, 0], [7, 0, 26, 1],
-    [4, 0, 27, 0], [26, 0, 28, 0], [27, 0, 28, 1], [3, 0, 28, 2],
-    [23, 1, 29, 0], [1, 0, 29, 1],               // INT counter value and a BOOL into REAL inputs
-    [30, 0, 30, 0],                               // feedback loop: toggles every cycle
-    [16, 0, 40, 0], [19, 0, 41, 0], [28, 0, 42, 0], [24, 0, 43, 0],
-  ],
-};
+const allBlocks = require('../examples/all-blocks.json');
+
 
 class FakeHal extends NullHal {
   constructor() { super(); this.din = {}; this.ain = {}; this.vin = {}; this.sens = {}; this.dout = {}; this.pwm = {}; this.now = { dow: 2, m: 600 }; }
@@ -131,7 +77,7 @@ test('export: standard IEC blocks, located I/O and EOS library', () => {
   assert.ok(r.xml.includes('FB_B30_0'), 'feedback loop routed through a variable');
   assert.ok(r.xml.includes('interval="T#20ms"'));
   assert.deepEqual(r.ioMap.map((m) => m.address + '=' + m.pin).sort(),
-    ['%IW0=34', '%IX0.0=4', '%IX0.1=5', '%QW0=25', '%QX0.0=16', '%QX0.1=17', '%QX0.2=18'].sort());
+    ['%IW0=34', '%IX0.0=4', '%IX0.1=5', '%QW0=25', '%QX0.0=16', '%QX0.1=17', '%QX0.2=18', '%QX0.3=19'].sort());
   assert.ok(r.warnings.some((w) => /sensor/.test(w)));
 });
 
