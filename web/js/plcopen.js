@@ -525,23 +525,38 @@ END_IF;`,
 
     // --- serialize FBD
     const rel = (x, y) => X('relPosition', { x: Math.round(x), y: Math.round(y) });
-    const conn = (src) => (src ? X('connection', { refLocalId: src.el.id, formalParameter: src.param || undefined }) : null);
+    const varW = (e) => Math.max(40, e.expr.length * 8 + 10);
+    // Absolute point of a source's output pin.
+    const outPt = (src) => {
+      const e = src.el;
+      if (e.kind === 'in') return [e.x + varW(e), e.y + 15];
+      const k = Math.max(0, e.outs.findIndex((o) => o.formal === src.param));
+      return [e.x + BW, e.y + 40 + 20 * k];
+    };
+    // A wire: OpenPLC/Beremiz expect its route as <position> points, from the input pin
+    // back to the source's output pin (they use the last point to find the output).
+    const pt = (x, y) => X('position', { x: Math.round(x), y: Math.round(y) });
+    const conn = (src, ix, iy) => {
+      if (!src) return null;
+      const [ox, oy] = outPt(src);
+      return X('connection', { refLocalId: src.el.id, formalParameter: src.param || undefined }, pt(ix, iy), pt(ox, oy));
+    };
     const fbd = els.map((e) => {
       const pos = X('position', { x: Math.round(e.x), y: Math.round(e.y) });
       const ad = e.eos ? eosData(e.eos) : null;
       if (e.kind === 'in') {
-        const w = Math.max(40, e.expr.length * 8 + 10);
+        const w = varW(e);
         return X('inVariable', { localId: e.id, height: 30, width: w, negated: e.negated ? 'true' : undefined }, pos,
           X('connectionPointOut', {}, rel(w, 15)), X('expression', {}, e.expr), ad);
       }
       if (e.kind === 'out') {
-        return X('outVariable', { localId: e.id, height: 30, width: Math.max(40, e.expr.length * 8 + 10), negated: e.negated ? 'true' : undefined }, pos,
-          X('connectionPointIn', {}, rel(0, 15), conn(e.src)), X('expression', {}, e.expr), ad);
+        return X('outVariable', { localId: e.id, height: 30, width: varW(e), negated: e.negated ? 'true' : undefined }, pos,
+          X('connectionPointIn', {}, rel(0, 15), conn(e.src, e.x, e.y + 15)), X('expression', {}, e.expr), ad);
       }
       const h = 40 + 20 * Math.max(e.ins.length, e.outs.length);
       return X('block', { localId: e.id, typeName: e.typeName, instanceName: e.instance, width: BW, height: h }, pos,
         X('inputVariables', {}, e.ins.map((i, k) => X('variable', { formalParameter: i.formal },
-          X('connectionPointIn', {}, rel(0, 40 + 20 * k), conn(i.src))))),
+          X('connectionPointIn', {}, rel(0, 40 + 20 * k), conn(i.src, e.x, e.y + 40 + 20 * k))))),
         X('inOutVariables', {}),
         X('outputVariables', {}, e.outs.map((o, k) => X('variable', { formalParameter: o.formal, negated: o.neg ? 'true' : undefined },
           X('connectionPointOut', {}, rel(BW, 40 + 20 * k))))),
