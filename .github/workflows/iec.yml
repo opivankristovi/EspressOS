@@ -43,7 +43,7 @@ jobs:
       - name: Build iec2c
         if: steps.cache.outputs.cache-hit != 'true'
         working-directory: ../matiec
-        run: autoreconf -i && ./configure && make -j"$(nproc)" iec2c && mkdir -p ../matiec-bin && cp iec2c ../matiec-bin/
+        run: autoreconf -i && ./configure && make -j"$(nproc)" && mkdir -p ../matiec-bin && cp iec2c ../matiec-bin/
 
       - name: Export examples to PLCopen XML
         run: node tools/export_plcopen.js build/iec examples/*.json
