@@ -103,7 +103,8 @@
           <label>Scan cycle<select id="cycleMs"><option value="5">5 ms</option><option value="10">10 ms</option><option value="20">20 ms</option><option value="50">50 ms</option><option value="100">100 ms</option></select></label>
           <div class="row">
             <button class="btn" id="btnExport">Export .json</button>
-            <label class="btn">Import .json<input type="file" id="fileImport" accept=".json,application/json" hidden></label>
+            <button class="btn" id="btnExportXml" title="IEC 61131-3 PLCopen XML for OpenPLC Editor, Beremiz and other IEC tools">Export PLCopen XML</button>
+            <label class="btn">Import .json / .xml<input type="file" id="fileImport" accept=".json,.xml,application/json,text/xml" hidden></label>
             <button class="btn danger" id="btnNew">New program</button>
           </div>
           <h3>Board</h3>
@@ -122,6 +123,7 @@
 
 <script src="js/catalog.js"></script>
 <script src="js/sim.js"></script>
+<script src="js/plcopen.js"></script>
 <script src="js/api.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/app.js"></script>

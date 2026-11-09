@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["tools/mock_server.js", "8080"],
       "port": 8080
+    },
+    {
+      "name": "mock-board-configured",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/mock_server.js", "8081", "--configured"],
+      "port": 8081
     }
   ]
 }

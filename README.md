@@ -16,6 +16,7 @@ Remember Siemens LOGO!? You drop AND gates, timers and counters on a sheet, draw
 - **A control panel for free.** Add web switches, push buttons and setpoints to your program, and they show up as controls on the Live panel, from any phone on your network.
 - **Try it before you solder.** With no board connected, the same engine runs as a simulator in your browser. Click inputs to toggle them and watch the outputs respond.
 - **Built like a controller, not a toy.** Fixed 10 ms scan cycle on its own CPU core, outputs released to a safe state on stop or redeploy, a watchdog, and the program kept in flash across power cycles.
+- **Speaks IEC 61131-3.** Export to PLCopen XML for OpenPLC, Beremiz and other IEC tools, and import their FBD programs.
 - **Updates over the air.** New firmware or web UI uploads from the Settings page.
 
 <table>
@@ -49,7 +50,7 @@ Remember Siemens LOGO!? You drop AND gates, timers and counters on a sheet, draw
 npm run mock
 ```
 
-Then open http://localhost:8080 and import [`examples/greenhouse.json`](examples/greenhouse.json) from **Settings → Import**, or open http://localhost:8080/?sim for the in-browser simulator.
+Then open http://localhost:8080 and import [`examples/greenhouse.json`](examples/greenhouse.json) (or its PLCopen version [`greenhouse.xml`](examples/greenhouse.xml)) from **Settings → Import**, or open http://localhost:8080/?sim for the in-browser simulator.
 
 **Have an ESP32?** You need [PlatformIO](https://platformio.org/) (`pip install platformio`) and an ESP32 dev board (ESP32-WROOM, 4 MB).
 
@@ -93,13 +94,44 @@ Known limits: HTTP Basic auth over plain HTTP, so use it on a network you trust.
 
 **Adding a sensor driver.** The ESP32 can't compile code itself, so drivers are built into the firmware. To add one, write a small class in `firmware/src/Sensors.cpp`, list it in `DRIVERS` in `web/js/catalog.js`, rebuild, and upload `firmware.bin` from **Settings → Firmware update**. Until then, the generic I²C block handles many simple chips.
 
+## IEC 61131-3 / OpenPLC interoperability
+
+**Settings → Export PLCopen XML** writes your program as a PLCopen TC6 XML (v2.01) file with a Function Block Diagram. OpenPLC Editor, Beremiz and other IEC 61131-3 tools can open it. **Settings → Import** reads such files back, both EspressOS exports and FBD programs made elsewhere.
+
+| EspressOS block | IEC 61131-3 |
+|---|---|
+| AND / OR / XOR / NOT | `AND` / `OR` / `XOR` / `NOT` |
+| NAND / NOR | `AND` / `OR` with a negated output |
+| Latch (reset wins / set wins) | `RS` / `SR` |
+| Edge detect | `R_TRIG` + `F_TRIG` |
+| On-delay / Off-delay / Pulse | `TON` / `TOF` / `TP` |
+| Counter | `CTUD` (import also takes `CTU`) |
+| Compare / Math / Select | `GT` `GE` `LT` `LE` `EQ` `NE` / `ADD` `SUB` `MUL` `DIV` `MIN` `MAX` / `SEL` |
+| Digital in / out | variables at `%IX0.n` / `%QX0.n` |
+| Analog in / PWM out | `%IWn` / `%QWn` through `EOS_AI` / `EOS_AO` (0–65535 like OpenPLC) |
+| Blinker, Threshold, Scale, Weekly timer | `EOS_BLINK`, `EOS_THRESH`, `EOS_SCALE`, `EOS_WEEK`, written in Structured Text and included in the file |
+| Web switch / setpoint, Sensor value | plain variables (`V0_…`, `S_…`) |
+
+Feedback loops are routed through a variable, which gives the same one-cycle delay. GPIO pins, block numbers and sensor settings travel in the file's `addData` section, so an exported program imports back unchanged.
+
+When importing a file from another tool:
+- Located variables become I/O blocks. EspressOS assigns GPIO pins itself and lists them for you to check.
+- Internal variables become wires, and literals become block settings.
+- Variables that are only ever read become web controls.
+- Unsupported parts are listed instead of silently dropped: Ladder, ST or SFC bodies, `CTD` semantics, `LD` load inputs, and `ET` elapsed-time outputs.
+
+Limits:
+- OpenPLC sets ESP32 pins per board, so after exporting, copy the I/O table the export shows into OpenPLC's board settings.
+- Sensors and the weekly timer's clock have no IEC equivalent. They're exported as variables you feed from your PLC (`CLOCK_DOW` / `CLOCK_MINUTE`, `S_…`).
+- Exports are validated against the official PLCopen schema, but haven't yet been compiled with OpenPLC's `matiec` compiler. Please report anything it rejects.
+
 ## Development
 
 | What | Command |
 |---|---|
 | Editor against a fake board | `npm run mock`, then open http://localhost:8080 (starts in first-run setup mode; add `-- --configured` to skip it) |
 | Pure simulator | open http://localhost:8080/?sim |
-| JS engine tests | `npm test` |
+| JS engine + PLCopen tests | `npm test` (set `PLCOPEN_XSD` to OpenPLC/Beremiz's `tc6_xml_v201.xsd` and install `lxml` to also validate exports against the schema) |
 | C++ engine tests | `cd firmware && pio test -e native` (needs a host g++) |
 | Bundle the UI for the board | `npm run build:web` |
 
@@ -107,7 +139,7 @@ The engine is implemented twice: in C++ for the board (`firmware/lib/engine`) an
 
 ## Status
 
-EspressOS is young. A self-review found 18 issues across security, controller behaviour and the interface, and all have been fixed. The C++ engine (14 tests), JS engine (16 tests), the complete editor flow (against the mock board and the simulator) and the firmware build (1.55 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
+EspressOS is young. A self-review found 18 issues across security, controller behaviour and the interface, and all have been fixed. The C++ engine (14 tests), JS engine (16 tests), PLCopen import/export (7 tests, including schema validation and checking that a program behaves the same after export and re-import), the complete editor flow (against the mock board and the simulator) and the firmware build (1.55 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
 
 On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 

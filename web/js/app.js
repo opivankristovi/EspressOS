@@ -468,21 +468,38 @@
       r.ok ? toast('Rebooting…') : toast(r.err, true);
     });
     $('#cycleMs').addEventListener('change', (e) => { editor.checkpoint(); editor.prog.cycleMs = Number(e.target.value); editor.changed(); });
-    $('#btnExport').addEventListener('click', () => {
-      const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(editor.prog, null, 1)], { type: 'application/json' })), download: 'espressos-program.json' });
+    const download = (blob, name) => {
+      const a = h('a', { href: URL.createObjectURL(blob), download: name });
       document.body.append(a); a.click(); a.remove();
+    };
+    $('#btnExport').addEventListener('click', () => download(new Blob([JSON.stringify(editor.prog, null, 1)], { type: 'application/json' }), 'espressos-program.json'));
+    $('#btnExportXml').addEventListener('click', () => {
+      const name = (editor.prog.name || 'EspressOS program');
+      const r = PLCopen.exportPLCopen(editor.prog, { name, version: 'EspressOS' });
+      download(new Blob([r.xml], { type: 'application/xml' }), 'espressos-program.xml');
+      const io = r.ioMap.map((m) => `${m.address}  →  GPIO ${m.pin}  (B${m.block}, ${m.kind})`);
+      showReport('Exported as PLCopen XML', [
+        'Open the file in OpenPLC Editor or Beremiz (File → Open). The program is called "main"; helper blocks are named EOS_*.',
+        ...(io.length ? ['In OpenPLC, set these pins for your ESP32 board so the addresses match your wiring:'] : []),
+      ], io, r.warnings);
     });
     $('#fileImport').addEventListener('change', async (e) => {
       const file = e.target.files[0]; e.target.value = '';
       if (!file) return;
       try {
-        const p = JSON.parse(await file.text());
+        const text = await file.text();
+        let p, warnings = [];
+        if (/^\s*</.test(text)) ({ prog: p, warnings } = PLCopen.importPLCopen(text));
+        else p = JSON.parse(text);
         if (!Array.isArray(p.blocks) || !Array.isArray(p.wires)) throw new Error('not an EspressOS program');
+        const err = new Sim.Engine().load(p);
+        if (err) throw new Error(err);
         editor.checkpoint();
         editor.setProgram(Object.assign(Api.EMPTY(), p), true);
         editor.changed(); editor.fit();
         $('.tab[data-tab=editor]').click();
-        toast('Imported. Press Deploy to send it to the board.');
+        if (warnings.length) showReport('Imported ' + file.name, ['The program was converted. Check these points, then press Deploy:'], [], warnings);
+        else toast('Imported. Press Deploy to send it to the board.');
       } catch (x) { toast('Import failed: ' + x.message, true); }
     });
     $('#btnNew').addEventListener('click', () => {
@@ -597,6 +614,23 @@
           h('button', { class: 'btn sm', onclick: () => location.reload() }, 'Reconnect'));
       }
     }, 5000);
+  }
+
+  // ------------------------------------------------------------ import/export report
+  function showReport(title, intro, list, warnings) {
+    const close = h('button', { class: 'btn primary', type: 'button' }, 'OK');
+    const box = h('div', { class: 'modal', role: 'dialog', 'aria-label': title },
+      h('h2', {}, title),
+      intro.map((t) => h('p', { class: 'muted' }, t)),
+      list.length ? h('pre', { class: 'report' }, list.join('\n')) : null,
+      warnings.length ? h('div', {}, h('h3', {}, 'Please check'), h('ul', { class: 'issues' }, warnings.map((w) => h('li', { class: 'warn' }, w)))) : null,
+      h('div', { class: 'row' }, close));
+    const back = h('div', { class: 'modal-back' }, box);
+    const done = () => back.remove();
+    close.onclick = done;
+    back.addEventListener('click', (e) => { if (e.target === back) done(); });
+    document.body.append(back);
+    close.focus();
   }
 
   // ------------------------------------------------------------ first-run setup

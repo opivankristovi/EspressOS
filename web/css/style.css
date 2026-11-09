@@ -201,6 +201,8 @@ progress { width: 100%; margin-top: 8px; }
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: grid; place-items: center; z-index: 20; padding: 16px; }
 .modal { background: var(--panel); color: var(--text); border-radius: 10px; padding: 20px; width: min(420px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
 .modal h2 { margin-bottom: 8px; }
+.modal.wide, .modal:has(.report) { width: min(620px, 100%); }
+.report { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font-size: 12.5px; overflow-x: auto; white-space: pre; }
 .phone-only { display: none !important; }
 .sidetab.sideclose { flex: 0 0 44px; }
 

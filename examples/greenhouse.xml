@@ -1,0 +1,1028 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <fileHeader companyName="EspressOS" productName="EspressOS" productVersion="0.1.0" creationDateTime="2026-11-09T12:00:00"/>
+  <contentHeader name="Greenhouse" modificationDateTime="2026-11-09T12:00:00">
+    <coordinateInfo>
+      <fbd>
+        <scaling x="1" y="1"/>
+      </fbd>
+      <ld>
+        <scaling x="1" y="1"/>
+      </ld>
+      <sfc>
+        <scaling x="1" y="1"/>
+      </sfc>
+    </coordinateInfo>
+  </contentHeader>
+  <types>
+    <dataTypes/>
+    <pous>
+      <pou name="EOS_AO" pouType="function">
+        <interface>
+          <returnType>
+            <UINT/>
+          </returnType>
+          <inputVars>
+            <variable name="PCT">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+          </inputVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>
+              <![CDATA[EOS_AO := REAL_TO_UINT(LIMIT(0.0, PCT, 100.0) * 655.35);]]>
+            </xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p>PWM output: 0..100 % to the 0..65535 range OpenPLC writes to %QW.</xhtml:p>
+        </documentation>
+      </pou>
+      <pou name="EOS_BLINK" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="EN_IN">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="T_ON">
+              <type>
+                <TIME/>
+              </type>
+            </variable>
+            <variable name="T_OFF">
+              <type>
+                <TIME/>
+              </type>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="Q">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+          </outputVars>
+          <localVars>
+            <variable name="t_on_phase">
+              <type>
+                <derived name="TON"/>
+              </type>
+            </variable>
+            <variable name="t_off_phase">
+              <type>
+                <derived name="TON"/>
+              </type>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>
+              <![CDATA[t_on_phase(IN := EN_IN AND NOT t_off_phase.Q, PT := T_ON);
+t_off_phase(IN := t_on_phase.Q, PT := T_OFF);
+Q := EN_IN AND NOT t_on_phase.Q;]]>
+            </xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p>Blinker: while EN_IN is TRUE, Q is TRUE for T_ON then FALSE for T_OFF.</xhtml:p>
+        </documentation>
+      </pou>
+      <pou name="EOS_SCALE" pouType="function">
+        <interface>
+          <returnType>
+            <REAL/>
+          </returnType>
+          <inputVars>
+            <variable name="IN">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="IN_MIN">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="IN_MAX">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="OUT_MIN">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="OUT_MAX">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="CLAMP">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+          </inputVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>
+              <![CDATA[IF IN_MAX = IN_MIN THEN
+  EOS_SCALE := OUT_MIN;
+ELSE
+  EOS_SCALE := OUT_MIN + (IN - IN_MIN) * (OUT_MAX - OUT_MIN) / (IN_MAX - IN_MIN);
+  IF CLAMP THEN
+    EOS_SCALE := LIMIT(MIN(OUT_MIN, OUT_MAX), EOS_SCALE, MAX(OUT_MIN, OUT_MAX));
+  END_IF;
+END_IF;]]>
+            </xhtml:p>
+          </ST>
+        </body>
+      </pou>
+      <pou name="EOS_THRESH" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="IN">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="ON_LEVEL">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+            <variable name="OFF_LEVEL">
+              <type>
+                <REAL/>
+              </type>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="Q">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+          </outputVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>
+              <![CDATA[IF ON_LEVEL >= OFF_LEVEL THEN
+  IF IN >= ON_LEVEL THEN Q := TRUE; ELSIF IN <= OFF_LEVEL THEN Q := FALSE; END_IF;
+ELSE
+  IF IN <= ON_LEVEL THEN Q := TRUE; ELSIF IN >= OFF_LEVEL THEN Q := FALSE; END_IF;
+END_IF;]]>
+            </xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p>Threshold with hysteresis. ON_LEVEL &gt; OFF_LEVEL: on above ON_LEVEL. ON_LEVEL &lt; OFF_LEVEL: on below ON_LEVEL.</xhtml:p>
+        </documentation>
+      </pou>
+      <pou name="EOS_WEEK" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="DAYS">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+            <variable name="ON_MIN">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+            <variable name="OFF_MIN">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+            <variable name="DOW">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+            <variable name="MINUTE">
+              <type>
+                <INT/>
+              </type>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="Q">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+          </outputVars>
+          <localVars>
+            <variable name="today">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+            <variable name="yesterday">
+              <type>
+                <BOOL/>
+              </type>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>
+              <![CDATA[today := (SHR(INT_TO_WORD(DAYS), DOW) AND 16#0001) <> 0;
+yesterday := (SHR(INT_TO_WORD(DAYS), (DOW + 6) MOD 7) AND 16#0001) <> 0;
+IF ON_MIN <= OFF_MIN THEN
+  Q := today AND MINUTE >= ON_MIN AND MINUTE < OFF_MIN;
+ELSE
+  Q := (today AND MINUTE >= ON_MIN) OR (yesterday AND MINUTE < OFF_MIN);
+END_IF;]]>
+            </xhtml:p>
+          </ST>
+        </body>
+        <documentation>
+          <xhtml:p>Weekly timer. DAYS bit 0 = Sunday. DOW (0 = Sunday) and MINUTE (minute of the day) must come from a clock.</xhtml:p>
+        </documentation>
+      </pou>
+      <pou name="main" pouType="program">
+        <interface>
+          <localVars>
+            <variable name="S_Greenhouse_Temperature">
+              <type>
+                <REAL/>
+              </type>
+              <documentation>
+                <xhtml:p>EspressOS sensor BME280 channel Temperature</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="S_Greenhouse_Temperature_OK">
+              <type>
+                <BOOL/>
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE"/>
+              </initialValue>
+              <documentation>
+                <xhtml:p>TRUE while the sensor answers</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="V0_Auto_vent">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>EspressOS web switch slot 0</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="DO_B5_Vent_fan" address="%QX0.0">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 26</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="S_Greenhouse_Humidity">
+              <type>
+                <REAL/>
+              </type>
+              <documentation>
+                <xhtml:p>EspressOS sensor BME280 channel Humidity</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="S_Greenhouse_Humidity_OK">
+              <type>
+                <BOOL/>
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE"/>
+              </initialValue>
+              <documentation>
+                <xhtml:p>TRUE while the sensor answers</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="V1_Mist_now">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>EspressOS web push button slot 1</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="DO_B10_Mister_valve" address="%QX0.1">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 27</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="CLOCK_DOW">
+              <type>
+                <INT/>
+              </type>
+              <documentation>
+                <xhtml:p>Day of week, 0 = Sunday. Set it from a real-time clock.</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="CLOCK_MINUTE">
+              <type>
+                <INT/>
+              </type>
+              <documentation>
+                <xhtml:p>Minute of the day, 0..1439. Set it from a real-time clock.</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="DO_B12_Path_lights" address="%QX0.2">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 25</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="DI_B13_Door_open" address="%IX0.0">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 4</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="DO_B16_Alarm_lamp" address="%QX0.3">
+              <type>
+                <BOOL/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 14</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="S_Sunlight_Light">
+              <type>
+                <REAL/>
+              </type>
+              <documentation>
+                <xhtml:p>EspressOS sensor BH1750 channel Light</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="S_Sunlight_Light_OK">
+              <type>
+                <BOOL/>
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE"/>
+              </initialValue>
+              <documentation>
+                <xhtml:p>TRUE while the sensor answers</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="AO_B19_Grow_light" address="%QW0">
+              <type>
+                <UINT/>
+              </type>
+              <documentation>
+                <xhtml:p>GPIO 33 (PWM)</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="EOS_THRESH_B2">
+              <type>
+                <derived name="EOS_THRESH"/>
+              </type>
+            </variable>
+            <variable name="EOS_WEEK_B11">
+              <type>
+                <derived name="EOS_WEEK"/>
+              </type>
+            </variable>
+            <variable name="TON_B14">
+              <type>
+                <derived name="TON"/>
+              </type>
+            </variable>
+            <variable name="EOS_BLINK_B15">
+              <type>
+                <derived name="EOS_BLINK"/>
+              </type>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <FBD>
+            <inVariable localId="1" height="30" width="202">
+              <position x="40" y="40"/>
+              <connectionPointOut>
+                <relPosition x="202" y="15"/>
+              </connectionPointOut>
+              <expression>S_Greenhouse_Temperature</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:1,&quot;type&quot;:&quot;SENSOR&quot;,&quot;p&quot;:{&quot;dev&quot;:1,&quot;ch&quot;:0},&quot;note&quot;:&quot;Air temp&quot;}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <inVariable localId="2" height="30" width="226">
+              <position x="40" y="80"/>
+              <connectionPointOut>
+                <relPosition x="226" y="15"/>
+              </connectionPointOut>
+              <expression>S_Greenhouse_Temperature_OK</expression>
+            </inVariable>
+            <block localId="3" typeName="EOS_THRESH" instanceName="EOS_THRESH_B2" width="100" height="100">
+              <position x="220" y="40"/>
+              <inputVariables>
+                <variable formalParameter="IN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="1"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="ON_LEVEL">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="4"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="OFF_LEVEL">
+                  <connectionPointIn>
+                    <relPosition x="0" y="80"/>
+                    <connection refLocalId="5"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="Q">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:2,&quot;type&quot;:&quot;THRESH&quot;,&quot;p&quot;:{&quot;on&quot;:26,&quot;off&quot;:24},&quot;note&quot;:&quot;Too warm&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="4" height="30" width="42">
+              <position x="130" y="60"/>
+              <connectionPointOut>
+                <relPosition x="42" y="15"/>
+              </connectionPointOut>
+              <expression>26.0</expression>
+            </inVariable>
+            <inVariable localId="5" height="30" width="42">
+              <position x="130" y="80"/>
+              <connectionPointOut>
+                <relPosition x="42" y="15"/>
+              </connectionPointOut>
+              <expression>24.0</expression>
+            </inVariable>
+            <block localId="6" typeName="AND" width="100" height="80">
+              <position x="400" y="40"/>
+              <inputVariables>
+                <variable formalParameter="IN1">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="3" formalParameter="Q"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="IN2">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="7"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="OUT">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:3,&quot;type&quot;:&quot;AND&quot;,&quot;p&quot;:{}}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="7" height="30" width="106">
+              <position x="40" y="140"/>
+              <connectionPointOut>
+                <relPosition x="106" y="15"/>
+              </connectionPointOut>
+              <expression>V0_Auto_vent</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:4,&quot;type&quot;:&quot;VIN&quot;,&quot;ui&quot;:&quot;VSWITCH&quot;,&quot;p&quot;:{&quot;idx&quot;:0,&quot;mode&quot;:&quot;switch&quot;,&quot;name&quot;:&quot;Auto vent&quot;}}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <outVariable localId="8" height="30" width="122" negated="true">
+              <position x="580" y="60"/>
+              <connectionPointIn>
+                <relPosition x="0" y="15"/>
+                <connection refLocalId="6" formalParameter="OUT"/>
+              </connectionPointIn>
+              <expression>DO_B5_Vent_fan</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:5,&quot;type&quot;:&quot;DO&quot;,&quot;p&quot;:{&quot;pin&quot;:26,&quot;inv&quot;:1},&quot;note&quot;:&quot;Vent fan&quot;}"/>
+                </data>
+              </addData>
+            </outVariable>
+            <inVariable localId="9" height="30" width="178">
+              <position x="40" y="260"/>
+              <connectionPointOut>
+                <relPosition x="178" y="15"/>
+              </connectionPointOut>
+              <expression>S_Greenhouse_Humidity</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:6,&quot;type&quot;:&quot;SENSOR&quot;,&quot;p&quot;:{&quot;dev&quot;:1,&quot;ch&quot;:1},&quot;note&quot;:&quot;Humidity&quot;}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <inVariable localId="10" height="30" width="202">
+              <position x="40" y="300"/>
+              <connectionPointOut>
+                <relPosition x="202" y="15"/>
+              </connectionPointOut>
+              <expression>S_Greenhouse_Humidity_OK</expression>
+            </inVariable>
+            <block localId="11" typeName="LT" width="100" height="80">
+              <position x="220" y="260"/>
+              <inputVariables>
+                <variable formalParameter="IN1">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="9"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="IN2">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="39"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="OUT">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:7,&quot;type&quot;:&quot;CMP&quot;,&quot;p&quot;:{&quot;op&quot;:&quot;&lt;&quot;,&quot;b&quot;:40},&quot;note&quot;:&quot;Too dry&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <block localId="12" typeName="OR" width="100" height="80">
+              <position x="400" y="260"/>
+              <inputVariables>
+                <variable formalParameter="IN1">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="11" formalParameter="OUT"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="IN2">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="13"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="OUT">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:8,&quot;type&quot;:&quot;OR&quot;,&quot;p&quot;:{}}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="13" height="30" width="98">
+              <position x="40" y="360"/>
+              <connectionPointOut>
+                <relPosition x="98" y="15"/>
+              </connectionPointOut>
+              <expression>V1_Mist_now</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:9,&quot;type&quot;:&quot;VIN&quot;,&quot;ui&quot;:&quot;VSWITCH&quot;,&quot;p&quot;:{&quot;idx&quot;:1,&quot;mode&quot;:&quot;button&quot;,&quot;name&quot;:&quot;Mist now&quot;}}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <outVariable localId="14" height="30" width="162">
+              <position x="580" y="280"/>
+              <connectionPointIn>
+                <relPosition x="0" y="15"/>
+                <connection refLocalId="12" formalParameter="OUT"/>
+              </connectionPointIn>
+              <expression>DO_B10_Mister_valve</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:10,&quot;type&quot;:&quot;DO&quot;,&quot;p&quot;:{&quot;pin&quot;:27,&quot;inv&quot;:0},&quot;note&quot;:&quot;Mister valve&quot;}"/>
+                </data>
+              </addData>
+            </outVariable>
+            <block localId="15" typeName="EOS_WEEK" instanceName="EOS_WEEK_B11" width="100" height="140">
+              <position x="40" y="480"/>
+              <inputVariables>
+                <variable formalParameter="DAYS">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="16"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="ON_MIN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="17"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="OFF_MIN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="80"/>
+                    <connection refLocalId="18"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="DOW">
+                  <connectionPointIn>
+                    <relPosition x="0" y="100"/>
+                    <connection refLocalId="19"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="MINUTE">
+                  <connectionPointIn>
+                    <relPosition x="0" y="120"/>
+                    <connection refLocalId="20"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="Q">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:11,&quot;type&quot;:&quot;WEEK&quot;,&quot;p&quot;:{&quot;days&quot;:127,&quot;on&quot;:1140,&quot;off&quot;:420},&quot;note&quot;:&quot;Night&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="16" height="30" width="40">
+              <position x="-50" y="480"/>
+              <connectionPointOut>
+                <relPosition x="40" y="15"/>
+              </connectionPointOut>
+              <expression>127</expression>
+            </inVariable>
+            <inVariable localId="17" height="30" width="42">
+              <position x="-50" y="500"/>
+              <connectionPointOut>
+                <relPosition x="42" y="15"/>
+              </connectionPointOut>
+              <expression>1140</expression>
+            </inVariable>
+            <inVariable localId="18" height="30" width="40">
+              <position x="-50" y="520"/>
+              <connectionPointOut>
+                <relPosition x="40" y="15"/>
+              </connectionPointOut>
+              <expression>420</expression>
+            </inVariable>
+            <inVariable localId="19" height="30" width="82">
+              <position x="-50" y="540"/>
+              <connectionPointOut>
+                <relPosition x="82" y="15"/>
+              </connectionPointOut>
+              <expression>CLOCK_DOW</expression>
+            </inVariable>
+            <inVariable localId="20" height="30" width="106">
+              <position x="-50" y="560"/>
+              <connectionPointOut>
+                <relPosition x="106" y="15"/>
+              </connectionPointOut>
+              <expression>CLOCK_MINUTE</expression>
+            </inVariable>
+            <outVariable localId="21" height="30" width="154">
+              <position x="580" y="480"/>
+              <connectionPointIn>
+                <relPosition x="0" y="15"/>
+                <connection refLocalId="15" formalParameter="Q"/>
+              </connectionPointIn>
+              <expression>DO_B12_Path_lights</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:12,&quot;type&quot;:&quot;DO&quot;,&quot;p&quot;:{&quot;pin&quot;:25,&quot;inv&quot;:0},&quot;note&quot;:&quot;Path lights&quot;}"/>
+                </data>
+              </addData>
+            </outVariable>
+            <inVariable localId="22" height="30" width="138" negated="true">
+              <position x="40" y="590"/>
+              <connectionPointOut>
+                <relPosition x="138" y="15"/>
+              </connectionPointOut>
+              <expression>DI_B13_Door_open</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:13,&quot;type&quot;:&quot;DI&quot;,&quot;p&quot;:{&quot;pin&quot;:4,&quot;pull&quot;:1,&quot;inv&quot;:1},&quot;note&quot;:&quot;Door open&quot;}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <block localId="23" typeName="TON" instanceName="TON_B14" width="100" height="80">
+              <position x="220" y="590"/>
+              <inputVariables>
+                <variable formalParameter="IN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="22"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="PT">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="24"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="Q">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:14,&quot;type&quot;:&quot;TON&quot;,&quot;p&quot;:{&quot;t&quot;:5},&quot;note&quot;:&quot;Left open&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="24" height="30" width="74">
+              <position x="130" y="610"/>
+              <connectionPointOut>
+                <relPosition x="74" y="15"/>
+              </connectionPointOut>
+              <expression>T#5000ms</expression>
+            </inVariable>
+            <block localId="25" typeName="EOS_BLINK" instanceName="EOS_BLINK_B15" width="100" height="100">
+              <position x="400" y="590"/>
+              <inputVariables>
+                <variable formalParameter="EN_IN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="23" formalParameter="Q"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="T_ON">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="26"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="T_OFF">
+                  <connectionPointIn>
+                    <relPosition x="0" y="80"/>
+                    <connection refLocalId="27"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="Q">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:15,&quot;type&quot;:&quot;BLINK&quot;,&quot;p&quot;:{&quot;on&quot;:0.5,&quot;off&quot;:0.5}}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="26" height="30" width="66">
+              <position x="310" y="610"/>
+              <connectionPointOut>
+                <relPosition x="66" y="15"/>
+              </connectionPointOut>
+              <expression>T#500ms</expression>
+            </inVariable>
+            <inVariable localId="27" height="30" width="66">
+              <position x="310" y="630"/>
+              <connectionPointOut>
+                <relPosition x="66" y="15"/>
+              </connectionPointOut>
+              <expression>T#500ms</expression>
+            </inVariable>
+            <outVariable localId="28" height="30" width="146">
+              <position x="580" y="590"/>
+              <connectionPointIn>
+                <relPosition x="0" y="15"/>
+                <connection refLocalId="25" formalParameter="Q"/>
+              </connectionPointIn>
+              <expression>DO_B16_Alarm_lamp</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:16,&quot;type&quot;:&quot;DO&quot;,&quot;p&quot;:{&quot;pin&quot;:14,&quot;inv&quot;:0},&quot;note&quot;:&quot;Alarm lamp&quot;}"/>
+                </data>
+              </addData>
+            </outVariable>
+            <inVariable localId="29" height="30" width="138">
+              <position x="40" y="700"/>
+              <connectionPointOut>
+                <relPosition x="138" y="15"/>
+              </connectionPointOut>
+              <expression>S_Sunlight_Light</expression>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:17,&quot;type&quot;:&quot;SENSOR&quot;,&quot;p&quot;:{&quot;dev&quot;:2,&quot;ch&quot;:0},&quot;note&quot;:&quot;Sunlight&quot;}"/>
+                </data>
+              </addData>
+            </inVariable>
+            <inVariable localId="30" height="30" width="162">
+              <position x="40" y="740"/>
+              <connectionPointOut>
+                <relPosition x="162" y="15"/>
+              </connectionPointOut>
+              <expression>S_Sunlight_Light_OK</expression>
+            </inVariable>
+            <block localId="31" typeName="EOS_SCALE" width="100" height="160">
+              <position x="220" y="700"/>
+              <inputVariables>
+                <variable formalParameter="IN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="29"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="IN_MIN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="60"/>
+                    <connection refLocalId="32"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="IN_MAX">
+                  <connectionPointIn>
+                    <relPosition x="0" y="80"/>
+                    <connection refLocalId="33"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="OUT_MIN">
+                  <connectionPointIn>
+                    <relPosition x="0" y="100"/>
+                    <connection refLocalId="34"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="OUT_MAX">
+                  <connectionPointIn>
+                    <relPosition x="0" y="120"/>
+                    <connection refLocalId="35"/>
+                  </connectionPointIn>
+                </variable>
+                <variable formalParameter="CLAMP">
+                  <connectionPointIn>
+                    <relPosition x="0" y="140"/>
+                    <connection refLocalId="36"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="OUT">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:18,&quot;type&quot;:&quot;SCALE&quot;,&quot;p&quot;:{&quot;inMin&quot;:0,&quot;inMax&quot;:800,&quot;outMin&quot;:100,&quot;outMax&quot;:0,&quot;clamp&quot;:1},&quot;note&quot;:&quot;Top up&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <inVariable localId="32" height="30" width="40">
+              <position x="130" y="720"/>
+              <connectionPointOut>
+                <relPosition x="40" y="15"/>
+              </connectionPointOut>
+              <expression>0.0</expression>
+            </inVariable>
+            <inVariable localId="33" height="30" width="50">
+              <position x="130" y="740"/>
+              <connectionPointOut>
+                <relPosition x="50" y="15"/>
+              </connectionPointOut>
+              <expression>800.0</expression>
+            </inVariable>
+            <inVariable localId="34" height="30" width="50">
+              <position x="130" y="760"/>
+              <connectionPointOut>
+                <relPosition x="50" y="15"/>
+              </connectionPointOut>
+              <expression>100.0</expression>
+            </inVariable>
+            <inVariable localId="35" height="30" width="40">
+              <position x="130" y="780"/>
+              <connectionPointOut>
+                <relPosition x="40" y="15"/>
+              </connectionPointOut>
+              <expression>0.0</expression>
+            </inVariable>
+            <inVariable localId="36" height="30" width="42">
+              <position x="130" y="800"/>
+              <connectionPointOut>
+                <relPosition x="42" y="15"/>
+              </connectionPointOut>
+              <expression>TRUE</expression>
+            </inVariable>
+            <block localId="37" typeName="EOS_AO" width="100" height="60">
+              <position x="580" y="700"/>
+              <inputVariables>
+                <variable formalParameter="PCT">
+                  <connectionPointIn>
+                    <relPosition x="0" y="40"/>
+                    <connection refLocalId="31" formalParameter="OUT"/>
+                  </connectionPointIn>
+                </variable>
+              </inputVariables>
+              <inOutVariables/>
+              <outputVariables>
+                <variable formalParameter="OUT">
+                  <connectionPointOut>
+                    <relPosition x="100" y="40"/>
+                  </connectionPointOut>
+                </variable>
+              </outputVariables>
+              <addData>
+                <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+                  <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;id&quot;:19,&quot;type&quot;:&quot;AO&quot;,&quot;p&quot;:{&quot;pin&quot;:33,&quot;freq&quot;:1000},&quot;note&quot;:&quot;Grow light&quot;}"/>
+                </data>
+              </addData>
+            </block>
+            <outVariable localId="38" height="30" width="146">
+              <position x="740" y="700"/>
+              <connectionPointIn>
+                <relPosition x="0" y="15"/>
+                <connection refLocalId="37" formalParameter="OUT"/>
+              </connectionPointIn>
+              <expression>AO_B19_Grow_light</expression>
+            </outVariable>
+            <inVariable localId="39" height="30" width="42">
+              <position x="160" y="280"/>
+              <connectionPointOut>
+                <relPosition x="42" y="15"/>
+              </connectionPointOut>
+              <expression>40.0</expression>
+            </inVariable>
+          </FBD>
+        </body>
+        <documentation>
+          <xhtml:p>Exported from EspressOS. I/O map (set the same pins in OpenPLC board settings): %QX0.0 = GPIO 26 (B5, digital output); %QX0.1 = GPIO 27 (B10, digital output); %QX0.2 = GPIO 25 (B12, digital output); %IX0.0 = GPIO 4 (B13, digital input); %QX0.3 = GPIO 14 (B16, digital output); %QW0 = GPIO 33 (B19, analog (PWM) output)</xhtml:p>
+        </documentation>
+      </pou>
+    </pous>
+  </types>
+  <instances>
+    <configurations>
+      <configuration name="Config0">
+        <resource name="Res0">
+          <task name="task0" priority="0" interval="T#10ms">
+            <pouInstance name="instance0" typeName="main"/>
+          </task>
+        </resource>
+      </configuration>
+    </configurations>
+  </instances>
+  <addData>
+    <data name="https://github.com/opivankristovi/EspressOS" handleUnknown="discard">
+      <eos:info xmlns:eos="urn:espressos:plcopen:1" json="{&quot;version&quot;:1,&quot;cycleMs&quot;:10,&quot;devices&quot;:[{&quot;id&quot;:1,&quot;driver&quot;:&quot;BME280&quot;,&quot;name&quot;:&quot;Greenhouse&quot;,&quot;addr&quot;:118,&quot;poll&quot;:2},{&quot;id&quot;:2,&quot;driver&quot;:&quot;BH1750&quot;,&quot;name&quot;:&quot;Sunlight&quot;,&quot;addr&quot;:35,&quot;poll&quot;:1}]}"/>
+    </data>
+  </addData>
+</project>
