@@ -11,6 +11,16 @@
 
   const ms = (s) => (s <= 0 ? 0 : Math.round(s * 1000));
 
+  // Same pin rules as EspHal::pinProblem (lists live in catalog.js).
+  const Cat = typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.Catalog;
+  const PIN_USE = { DI: 'in', DO: 'out', AI: 'adc', AO: 'out' };
+  function pinProblem(pin, use) {
+    if (!Cat.IN_PINS.includes(pin)) return 'cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)';
+    if (use === 'out' && !Cat.OUT_PINS.includes(pin)) return 'is input-only';
+    if (use === 'adc' && !Cat.ADC_PINS.includes(pin)) return 'has no usable ADC (use 32-36 or 39)';
+    return null;
+  }
+
   function makeEval(type, p) {
     const n = (k, d) => (p[k] === undefined || p[k] === '' ? d : Number(p[k]));
     const s = (k, d) => (p[k] === undefined ? d : String(p[k]));
@@ -124,10 +134,20 @@
     // Returns null on success or an error string. Old program kept on error.
     load(prog) {
       if (typeof prog === 'string') { try { prog = JSON.parse(prog); } catch (e) { return 'JSON: ' + e.message; } }
-      const blocks = [], byId = new Map(); let nSig = 0;
+      const blocks = [], byId = new Map(), pinOwner = new Map(); let nSig = 0;
       for (const o of prog.blocks || []) {
         if (!(o.type in N_IN)) return "Unknown block type '" + o.type + "'";
         if (!(o.id > 0) || byId.has(o.id)) return 'Invalid or duplicate block id ' + o.id;
+        const use = PIN_USE[o.type];
+        if (use) {
+          const raw = o.p && o.p.pin, pin = raw === undefined || raw === '' || raw === null ? -1 : Number(raw);
+          if (!(pin >= 0)) return 'Block ' + o.id + ' has no GPIO pin';
+          const why = pinProblem(pin, use);
+          if (why) return 'Block ' + o.id + ': GPIO ' + pin + ' ' + why;
+          const prev = pinOwner.get(pin), drives = use === 'out';
+          if (prev && (drives || prev.drives)) return 'GPIO ' + pin + ' is used by block ' + prev.id + ' and block ' + o.id;
+          pinOwner.set(pin, { id: o.id, drives: drives || !!(prev && prev.drives) });
+        }
         const b = makeEval(o.type, o.p || {});
         Object.setPrototypeOf(b, BlockProto);
         b.id = o.id; b.type = o.type; b.extra = 0; b.in = [-1, -1, -1, -1]; b.out = [-1, -1];

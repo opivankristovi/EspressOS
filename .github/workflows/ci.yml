@@ -1,0 +1,39 @@
+name: CI
+
+# JS engine + PLCopen tests, C++ engine tests and the ESP32 firmware build.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm test
+      - name: Web bundle fits the board
+        run: python3 tools/build_web.py
+
+  firmware:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio
+      - name: C++ engine tests (native)
+        working-directory: firmware
+        run: pio test -e native
+      - name: Build firmware
+        working-directory: firmware
+        run: pio run -e esp32dev
+      - name: Build web UI image
+        run: python tools/build_web.py && cd firmware && pio run -e esp32dev -t buildfs

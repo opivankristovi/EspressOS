@@ -35,6 +35,15 @@ std::string fmt(const char* f, int a, int b = 0) {
   return buf;
 }
 
+bool pinUseOf(const std::string& type, PinUse* use) {
+  if (type == "DI") *use = PinUse::DigitalIn;
+  else if (type == "DO") *use = PinUse::DigitalOut;
+  else if (type == "AI") *use = PinUse::AnalogIn;
+  else if (type == "AO") *use = PinUse::PwmOut;
+  else return false;
+  return true;
+}
+
 }  // namespace
 
 bool Engine::load(const char* json, std::string& err) {
@@ -48,6 +57,7 @@ bool Engine::load(const char* json, std::string& err) {
   std::vector<std::unique_ptr<Block>> blocks;
   std::vector<const BlockType*> types;
   std::map<int, size_t> byId;
+  std::map<int, std::pair<int, bool>> pinOwner;  // pin -> (block id, drives it)
   size_t nSig = 0;
 
   for (JsonObjectConst o : jb) {
@@ -57,6 +67,19 @@ bool Engine::load(const char* json, std::string& err) {
     if (!bt) { err = "Unknown block type '" + type + "'"; return false; }
     if (id <= 0 || byId.count(id)) { err = fmt("Invalid or duplicate block id %d", id); return false; }
     JsonParams p(o["p"].as<JsonObjectConst>());
+    PinUse use;
+    if (pinUseOf(type, &use)) {
+      int pin = (int)p.num("pin", -1);
+      if (pin < 0) { err = fmt("Block %d has no GPIO pin", id); return false; }
+      if (const char* why = hal_.pinProblem(pin, use)) { err = fmt("Block %d: GPIO %d ", id, pin) + why; return false; }
+      bool drives = use == PinUse::DigitalOut || use == PinUse::PwmOut;
+      auto it = pinOwner.find(pin);
+      if (it != pinOwner.end() && (drives || it->second.second)) {
+        err = fmt("GPIO %d is used by block %d", pin, it->second.first) + fmt(" and block %d", id);
+        return false;
+      }
+      pinOwner[pin] = {id, drives || (it != pinOwner.end() && it->second.second)};
+    }
     Block* b = bt->create(p);
     if (!b) { err = "Cannot create " + type; return false; }
     b->id = id;

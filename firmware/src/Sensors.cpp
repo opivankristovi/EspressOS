@@ -206,8 +206,15 @@ void begin(int sda, int scl) {
   gScl = scl;
   Wire.begin(sda, scl);
   Wire.setClock(100000);
+  Wire.setTimeOut(20);  // ms; bounds every transfer if a device holds the bus
   lock = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(pollTask, "sensors", 6144, nullptr, 1, nullptr, 0);
+}
+
+bool usesI2c(JsonArrayConst devices) {
+  for (JsonObjectConst d : devices)
+    if (strcmp(d["driver"] | "", "DS18B20") != 0) return true;
+  return false;
 }
 
 bool validate(JsonArrayConst devices, String& err) {
@@ -298,17 +305,25 @@ String driversJson() {
 String i2cScanJson() {
   String s = "{\"sda\":" + String(gSda) + ",\"scl\":" + String(gScl) + ",\"found\":[";
   xSemaphoreTake(lock, portMAX_DELAY);
-  bool first = true;
-  for (int a = 1; a < 127; a++) {
+  bool first = true, stuck = false;
+  int timeouts = 0;
+  for (int a = 1; a < 127 && !stuck; a++) {
     Wire.beginTransmission(a);
-    if (Wire.endTransmission() == 0) {
+    uint8_t e = Wire.endTransmission();
+    if (e == 0) {
       if (!first) s += ",";
       s += String(a);
       first = false;
     }
+    // 5 = timeout: a device or short holds SDA/SCL. Stop early so the web
+    // server task is never blocked long enough to trip its watchdog.
+    timeouts = e == 5 ? timeouts + 1 : 0;
+    stuck = timeouts >= 3;
   }
   xSemaphoreGive(lock);
-  return s + "]}";
+  s += "]";
+  if (stuck) s += ",\"error\":\"The I2C bus is stuck (SDA or SCL held low). Check wiring and pull-ups.\"";
+  return s + "}";
 }
 
 }  // namespace Sensors

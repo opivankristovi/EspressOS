@@ -27,6 +27,7 @@
   let snap = null;        // latest monitor snapshot
   let liveKey = '';       // structure key of live panel
   let builtDrivers = null;
+  let i2cBus = { sda: 21, scl: 22 };  // replaced by the board's settings once known
   let connReason = '';    // 'board' | 'forced' | 'unreachable'
   const isPhone = () => window.matchMedia('(max-width: 900px)').matches;
   const openSide = (on) => $('.side').classList.toggle('open', on);
@@ -172,8 +173,12 @@
       if (['DI', 'DO', 'AI', 'AO'].includes(b.type)) {
         const k = Number(b.p.pin);
         const isOut = b.type === 'DO' || b.type === 'AO';
+        const allowed = b.type === 'AI' ? C.ADC_PINS : isOut ? C.OUT_PINS : C.IN_PINS;
+        if (!allowed.includes(k)) out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: GPIO ${b.p.pin} cannot be used for this (pick another pin)` });
         if (pins[k] && (isOut || pins[k].out)) out.push({ lvl: 'err', msg: `GPIO ${k} used by B${pins[k].id} and B${b.id}` });
-        pins[k] = { id: b.id, out: isOut };
+        if (i2cBus && prog.devices.some((x) => x.driver !== 'DS18B20') && (k === i2cBus.sda || k === i2cBus.scl))
+          out.push({ lvl: 'err', msg: `B${b.id}: GPIO ${k} is the I²C bus used by your sensors` });
+        pins[k] = { id: b.id, out: isOut || !!(pins[k] && pins[k].out) };
       }
       if ((b.type === 'DO' || b.type === 'AO') && !wiredIn.has(b.id + '.0')) out.push({ lvl: 'warn', msg: `B${b.id} ${d.label} has no input wire` });
       if (b.type === 'SENSOR' && !prog.devices.find((x) => x.id === Number(b.p.dev))) out.push({ lvl: 'err', msg: `B${b.id} reads a sensor that does not exist` });
@@ -424,6 +429,8 @@
     try {
       const r = await be.scanI2C();
       box.textContent = '';
+      if (r.error) box.append(h('p', { class: 'err' }, r.error));
+      if (!r.found.length && r.error) return;
       if (!r.found.length) { box.append(h('span', { class: 'muted' }, `Nothing found on SDA ${r.sda} / SCL ${r.scl}. Check wiring and pull-ups.`)); return; }
       for (const a of r.found) {
         const matches = C.DRIVERS.filter((d) => (d.addrs || []).includes(a));
@@ -443,6 +450,8 @@
       const c = await be.getConfig();
       f.ssid.value = c.ssid || ''; f.host.value = c.host || ''; f.tz.value = c.tz || ''; f.sda.value = c.sda; f.scl.value = c.scl;
       f.adminPass.placeholder = c.hasAdminPass ? 'unchanged' : 'none (open access)';
+      $('#apKey').textContent = c.apKey || '';
+      $('#apKeyInfo').hidden = !c.apKey;
     } catch { /* offline */ }
     refreshInfo();
   }
@@ -561,6 +570,7 @@
     ({ be, reason: connReason } = await Api.connect());
     showConnBanner();
     try { builtDrivers = await be.drivers(); } catch { builtDrivers = null; }
+    try { const c = await be.getConfig(); if (c && Number.isInteger(c.sda)) i2cBus = { sda: c.sda, scl: c.scl }; } catch { /* keep defaults */ }
 
     let prog;
     try { prog = await be.getProgram(); } catch { prog = Api.EMPTY(); }

@@ -5,9 +5,13 @@
 
 namespace eos {
 
+enum class PinUse { DigitalIn, DigitalOut, AnalogIn, PwmOut };
+
 class Hal {
  public:
   virtual ~Hal() {}
+  // nullptr if `pin` can be used this way, else a short reason ("is input-only").
+  virtual const char* pinProblem(int pin, PinUse use) { (void)pin; (void)use; return nullptr; }
   virtual void setupInput(int pin, bool pullup) { (void)pin; (void)pullup; }
   // Configure pin as output, driving `level` from the very first instant
   // (so active-low relays never see a glitch).

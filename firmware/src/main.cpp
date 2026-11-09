@@ -32,6 +32,7 @@ struct Config {
   String ssid, pass;  // Wi-Fi password must stay recoverable to connect
   String host = "espressos";
   String adminHash, adminSalt;  // salted SHA-256 of the admin password; empty = setup mode
+  String apKey;                  // WPA2 key of the fallback setup network once an admin password exists
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   int sda = 21, scl = 22;
 };
@@ -42,6 +43,7 @@ static eos::Engine engine(hal);
 static SemaphoreHandle_t engineLock;
 static String lastError;
 static bool apMode = false;
+static bool configLocked = false;  // config.json unreadable: refuse logins instead of falling back to setup mode
 static bool timeConfigured = false;
 static uint32_t staLostSince = 0, lastStaRetry = 0;
 
@@ -58,13 +60,39 @@ static String readFile(const char* path) {
   return s;
 }
 
+// Replaces a file without ever leaving a half-written one behind: the data goes
+// to <path>.tmp first, the old file becomes <path>.bak, then the new one is
+// renamed into place. A power cut at any point leaves one intact copy.
 static bool writeFile(const char* path, const char* data, size_t len) {
-  File f = LittleFS.open(path, "w");
+  String tmp = String(path) + ".tmp", bak = String(path) + ".bak";
+  File f = LittleFS.open(tmp, "w");
   if (!f) return false;
   size_t n = f.write((const uint8_t*)data, len);
   f.close();
-  return n == len;
+  if (n != len) { LittleFS.remove(tmp); return false; }
+  LittleFS.remove(bak);
+  if (LittleFS.exists(path) && !LittleFS.rename(path, bak)) { LittleFS.remove(tmp); return false; }
+  return LittleFS.rename(tmp, path);
 }
+
+static bool isJson(const String& s) {
+  JsonDocument d;
+  return s.length() && !deserializeJson(d, s);
+}
+
+// Contents of a JSON file, or of its backup if the file is missing or damaged.
+static String readJsonFile(const char* path) {
+  String s = readFile(path);
+  if (isJson(s)) return s;
+  String b = readFile((String(path) + ".bak").c_str());
+  if (isJson(b)) {
+    Serial.printf("%s damaged, using its backup\n", path);
+    return b;
+  }
+  return String();
+}
+
+static bool fileOrBackupExists(const char* path) { return LittleFS.exists(path) || LittleFS.exists(String(path) + ".bak"); }
 
 // ------------------------------------------------------------------ password
 static String sha256Hex(const String& s) {
@@ -75,16 +103,25 @@ static String sha256Hex(const String& s) {
   return String(hex);
 }
 
-static bool setupMode() { return cfg.adminHash.isEmpty(); }
+static bool setupMode() { return cfg.adminHash.isEmpty() && !configLocked; }
+
+static String randomKey(int len) {
+  static const char kChars[] = "abcdefghjkmnpqrstuvwxyz23456789";  // no look-alikes (l/1, o/0, i)
+  String k;
+  for (int i = 0; i < len; i++) k += kChars[esp_random() % (sizeof kChars - 1)];
+  return k;
+}
 
 static void setAdminPassword(const String& pass) {
   char salt[17];
   snprintf(salt, sizeof salt, "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
   cfg.adminSalt = salt;
   cfg.adminHash = sha256Hex(cfg.adminSalt + pass);
+  if (cfg.apKey.isEmpty()) cfg.apKey = randomKey(12);
 }
 
 static bool passwordMatches(const String& pass) {
+  if (configLocked) return false;
   String h = sha256Hex(cfg.adminSalt + pass);
   if (h.length() != cfg.adminHash.length()) return false;
   uint8_t diff = 0;  // constant-time compare
@@ -108,12 +145,63 @@ static bool credentialsOk(AsyncWebServerRequest* r) {
   return colon > 0 && cred.substring(0, colon) == "admin" && passwordMatches(cred.substring(colon + 1));
 }
 
+// Failed-login throttling per client address: after 5 failures the address is
+// locked out for 30 s, doubling with every further failure (max 16 min).
+struct LoginFails {
+  uint32_t ip = 0;
+  uint8_t n = 0;
+  uint32_t last = 0, until = 0;
+};
+static LoginFails loginFails[8];
+
+static LoginFails* loginFailsFor(uint32_t ip, bool create) {
+  LoginFails* slot = nullptr;
+  for (auto& f : loginFails) {
+    if (f.n && millis() - f.last > 15 * 60000UL) f = LoginFails();  // forgotten after 15 quiet minutes
+    if (f.n && f.ip == ip) return &f;
+    if (!slot || !f.n || (slot->n && f.last < slot->last)) slot = &f;  // a free slot, else the oldest
+  }
+  if (!create) return nullptr;
+  *slot = LoginFails();
+  slot->ip = ip;
+  return slot;
+}
+
+static uint32_t lockoutLeft(AsyncWebServerRequest* r) {
+  LoginFails* f = loginFailsFor(r->client()->getRemoteAddress(), false);
+  if (!f || !f->until) return 0;
+  int32_t left = (int32_t)(f->until - millis());
+  return left > 0 ? (uint32_t)left : 0;
+}
+
+static void noteLogin(AsyncWebServerRequest* r, bool ok) {
+  uint32_t ip = r->client()->getRemoteAddress();
+  if (ok) {
+    if (LoginFails* f = loginFailsFor(ip, false)) *f = LoginFails();
+    return;
+  }
+  LoginFails* f = loginFailsFor(ip, true);
+  if (f->n < 255) f->n++;
+  f->last = millis();
+  if (f->n >= 5) f->until = millis() + (30000UL << (f->n - 5 > 5 ? 5 : f->n - 5));
+}
+
 // ------------------------------------------------------------------ config
 static bool validI2cPins(int sda, int scl) { return EspHal::outputCapable(sda) && EspHal::outputCapable(scl) && sda != scl; }
 
 static void loadConfig() {
   JsonDocument d;
-  if (deserializeJson(d, readFile(kConfigFile))) return;
+  String text = readJsonFile(kConfigFile);
+  if (text.isEmpty() || deserializeJson(d, text)) {
+    // Settings exist but neither copy can be read: don't drop into the open setup
+    // mode (anyone nearby could claim the board). Logins are refused until the
+    // flash is erased over USB.
+    if (fileOrBackupExists(kConfigFile)) {
+      configLocked = true;
+      Serial.println("config.json unreadable: logins disabled. Erase the flash over USB to reset the board.");
+    }
+    return;
+  }
   cfg.ssid = d["ssid"] | "";
   cfg.pass = d["pass"] | "";
   cfg.host = d["host"] | "espressos";
@@ -122,12 +210,13 @@ static void loadConfig() {
   cfg.tz = d["tz"] | cfg.tz.c_str();
   cfg.sda = d["sda"] | 21;
   cfg.scl = d["scl"] | 22;
+  cfg.apKey = d["apKey"] | "";
   if (!validI2cPins(cfg.sda, cfg.scl)) { cfg.sda = 21; cfg.scl = 22; }  // never let a bad config brick the board
   String legacy = d["adminPass"] | "";  // v0.1.0 stored it in plain text
   if (legacy.length() && cfg.adminHash.isEmpty()) setAdminPassword(legacy);
 }
 
-static void saveConfig() {
+static bool saveConfig() {
   JsonDocument d;
   d["ssid"] = cfg.ssid;
   d["pass"] = cfg.pass;
@@ -137,9 +226,10 @@ static void saveConfig() {
   d["tz"] = cfg.tz;
   d["sda"] = cfg.sda;
   d["scl"] = cfg.scl;
+  d["apKey"] = cfg.apKey;
   String s;
   serializeJson(d, s);
-  writeFile(kConfigFile, s.c_str(), s.length());
+  return writeFile(kConfigFile, s.c_str(), s.length());
 }
 
 // ------------------------------------------------------------------ engine
@@ -149,6 +239,17 @@ static bool deploy(const char* json, String& err) {
   if (DeserializationError e = deserializeJson(doc, json)) { err = String("JSON: ") + e.c_str(); return false; }
   JsonArrayConst devs = doc["devices"].as<JsonArrayConst>();
   if (!Sensors::validate(devs, err)) return false;
+  if (Sensors::usesI2c(devs)) {
+    for (JsonObjectConst b : doc["blocks"].as<JsonArrayConst>()) {
+      int pin = b["p"]["pin"] | -1;
+      const char* t = b["type"] | "";
+      bool io = !strcmp(t, "DI") || !strcmp(t, "DO") || !strcmp(t, "AI") || !strcmp(t, "AO");
+      if (io && (pin == cfg.sda || pin == cfg.scl)) {
+        err = "Block " + String((int)(b["id"] | 0)) + ": GPIO " + String(pin) + " is the I2C bus (SDA " + String(cfg.sda) + ", SCL " + String(cfg.scl) + ")";
+        return false;
+      }
+    }
+  }
   // Engine and sensors are swapped together while the scan task is held off,
   // so no SENSOR block can read a device that is being replaced.
   std::string eerr;
@@ -213,10 +314,13 @@ static void startAp() {
   char name[32];
   snprintf(name, sizeof name, "EspressOS-%04X", (unsigned)(mac >> 32) & 0xFFFF);
   WiFi.mode(cfg.ssid.length() ? WIFI_AP_STA : WIFI_AP);  // keep retrying the router in the background
-  WiFi.softAP(name);
+  // First setup has nothing to protect yet, so its network is open. Once an admin
+  // password exists the fallback network uses WPA2 (its key is shown in Settings).
+  bool open = setupMode() || cfg.apKey.length() < 8;
+  WiFi.softAP(name, open ? nullptr : cfg.apKey.c_str());
   dns.start(53, "*", WiFi.softAPIP());
   apMode = true;
-  Serial.printf("Setup AP '%s' at %s\n", name, WiFi.softAPIP().toString().c_str());
+  Serial.printf("Setup AP '%s' (%s) at %s\n", name, open ? "open" : "WPA2, key in Settings", WiFi.softAPIP().toString().c_str());
 }
 
 static void stopAp() {
@@ -277,7 +381,7 @@ static void wifiTick() {
 // ------------------------------------------------------------------ request gate
 // One policy for every request, applied by the middleware AND by the body /
 // upload callbacks (the library streams bodies before middleware runs).
-enum Gate { kOk = 0, kNeedAuth = 401, kForbidden = 403 };
+enum Gate { kOk = 0, kNeedAuth = 401, kForbidden = 403, kTooMany = 429 };
 
 static bool hostOk(AsyncWebServerRequest* r) {
   // Rejecting foreign Host names defeats DNS-rebinding pages reading the API.
@@ -304,7 +408,10 @@ static Gate gate(AsyncWebServerRequest* r, const char** why) {
   bool write = r->method() != HTTP_GET && r->method() != HTTP_HEAD;
   *why = "";
   if (isApi && !hostOk(r)) { *why = "Unknown host name"; return kForbidden; }
-  if (!setupMode() && !credentialsOk(r)) return kNeedAuth;
+  if (!setupMode()) {
+    if (lockoutLeft(r)) { *why = "Too many failed logins; try again later"; return kTooMany; }
+    if (!credentialsOk(r)) return kNeedAuth;
+  }
   if (isApi && (write || url == "/ws") && !originOk(r)) { *why = "Cross-site request blocked"; return kForbidden; }
   // A header a foreign web page cannot add without a CORS preflight, which this server never approves.
   if (isApi && write && !r->hasHeader("X-EOS")) { *why = "Missing X-EOS header"; return kForbidden; }
@@ -346,9 +453,9 @@ static void collectBody(AsyncWebServerRequest* r, uint8_t* data, size_t len, siz
 static const char* body(AsyncWebServerRequest* r) { return r->_tempObject ? (const char*)r->_tempObject : nullptr; }
 
 // ------------------------------------------------------------------ OTA
-// Firmware images start with the ESP image magic 0xE9; anything else is a
-// LittleFS (web UI) image. A filesystem image would wipe the program and
-// settings, so those are kept in RAM and written back afterwards.
+// Accepts firmware images and LittleFS (web UI) images. A filesystem image
+// would wipe the program and settings, so those are kept in RAM and written
+// back afterwards.
 struct Ota {
   bool busy = false;
   bool fs = false;
@@ -356,6 +463,7 @@ struct Ota {
   bool ok = false;
   AsyncWebServerRequest* req = nullptr;
   String keepProgram, keepConfig, keepRunFlag;
+  String err;  // why the last upload was refused
 };
 static Ota ota;
 
@@ -379,10 +487,20 @@ static void otaUpload(AsyncWebServerRequest* r, const String&, size_t index, uin
   if (index == 0) {
     const char* why;
     if (gate(r, &why) != kOk || ota.busy || len == 0 || r->_tempObject) return;
+    // Firmware images start with the ESP image magic 0xE9; a LittleFS image has
+    // "littlefs" at byte 8 of its superblock. Anything else (partitions.bin, a
+    // renamed file...) would overwrite the web UI, so it is refused.
+    bool firmware = data[0] == 0xE9;
+    bool fsImage = len >= 16 && memcmp(data + 8, "littlefs", 8) == 0;
+    if (!firmware && !fsImage) {
+      ota.err = "Not a firmware or web UI image. Use firmware.bin or littlefs.bin from the build folder.";
+      return;
+    }
+    ota.err = "";
     ota.busy = true;
     ota.ok = false;
     ota.req = r;
-    ota.fs = data[0] != 0xE9;
+    ota.fs = fsImage;
     ota.wasRunning = engineRunning();
     engineSetRunning(false);  // outputs to safe state while flashing
     if (ota.fs) {
@@ -415,7 +533,7 @@ static void otaUpload(AsyncWebServerRequest* r, const String&, size_t index, uin
 }
 
 static void otaDone(AsyncWebServerRequest* r) {
-  if (!r->_tempObject) return sendResult(r, false, ota.busy ? "Another update is in progress" : "Update rejected");
+  if (!r->_tempObject) return sendResult(r, false, ota.busy ? "Another update is in progress" : ota.err.length() ? ota.err : "Update rejected");
   if (!ota.ok) return sendResult(r, false, Update.errorString());
   bool firmware = !ota.fs;
   sendResult(r, true, "");
@@ -427,14 +545,17 @@ static void setupRoutes() {
   server.addMiddleware([](AsyncWebServerRequest* r, ArMiddlewareNext next) {
     const char* why;
     Gate g = gate(r, &why);
+    // Logins are counted here only: the middleware runs exactly once per request.
+    if (r->hasHeader("Authorization") && (g == kOk || g == kNeedAuth) && !setupMode()) noteLogin(r, g == kOk);
     if (g == kNeedAuth) return r->requestAuthentication(AsyncAuthType::AUTH_BASIC, "EspressOS");
-    if (g == kForbidden) {
+    if (g != kOk) {
       JsonDocument d;
       d["ok"] = false;
       d["err"] = why;
+      if (g == kTooMany) d["retryAfter"] = (lockoutLeft(r) + 999) / 1000;
       String s;
       serializeJson(d, s);
-      return sendJson(r, 403, s);
+      return sendJson(r, (int)g, s);
     }
     next();
   });
@@ -477,9 +598,11 @@ static void setupRoutes() {
         String err;
         bool ok = deploy(b, err);
         if (ok) {
-          writeFile(kProgramFile, b, strlen(b));
-          writeFile(kRunFlagFile, "1", 1);
-          lastError = "";
+          if (!writeFile(kProgramFile, b, strlen(b)) || !writeFile(kRunFlagFile, "1", 1)) {
+            ok = false;
+            err = "Running, but it could not be saved to flash (full?): it will be lost on reboot";
+          }
+          lastError = ok ? "" : err;
         } else {
           lastError = err;
         }
@@ -523,6 +646,7 @@ static void setupRoutes() {
     d["sda"] = cfg.sda;
     d["scl"] = cfg.scl;
     d["hasAdminPass"] = !setupMode();
+    d["apKey"] = setupMode() ? "" : cfg.apKey;  // only ever sent to a logged-in admin
     String s;
     serializeJson(d, s);
     sendJson(r, 200, s);
@@ -553,7 +677,7 @@ static void setupRoutes() {
         if (newPass) setAdminPassword(newPass);  // takes effect immediately
         cfg.sda = sda;
         cfg.scl = scl;
-        saveConfig();
+        if (!saveConfig()) return sendResult(r, false, "Could not save the settings to flash");
         sendResult(r, true, "");
       },
       nullptr, collectBody);
@@ -589,11 +713,13 @@ void setup() {
   Serial.printf("\nEspressOS %s\n", EOS_VERSION);
   if (!LittleFS.begin(true)) Serial.println("LittleFS mount failed");
   loadConfig();
-  if (readFile(kConfigFile).indexOf("\"adminPass\"") >= 0) saveConfig();  // migrate plain-text password away
+  bool migrate = readFile(kConfigFile).indexOf("\"adminPass\"") >= 0;  // move a plain-text password away
+  if (!setupMode() && !configLocked && cfg.apKey.isEmpty()) { cfg.apKey = randomKey(12); migrate = true; }  // boards set up before AP keys
+  if (migrate) saveConfig();
   engineLock = xSemaphoreCreateMutex();
   Sensors::begin(cfg.sda, cfg.scl);
 
-  String prog = readFile(kProgramFile);
+  String prog = readJsonFile(kProgramFile);
   if (prog.length()) {
     String err;
     if (!deploy(prog.c_str(), err)) {

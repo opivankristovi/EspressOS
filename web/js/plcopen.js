@@ -39,12 +39,15 @@
       if (lt < 0) { cur().text += decode(src.slice(i)); break; }
       if (lt > i) cur().text += decode(src.slice(i, lt));
       i = lt;
-      if (src.startsWith('<?', i)) { i = src.indexOf('?>', i) + 2; continue; }
-      if (src.startsWith('<!--', i)) { i = src.indexOf('-->', i) + 3; continue; }
-      if (src.startsWith('<![CDATA[', i)) { const e = src.indexOf(']]>', i); cur().text += src.slice(i + 9, e); i = e + 3; continue; }
-      if (src.startsWith('<!', i)) { i = src.indexOf('>', i) + 1; continue; }
+      // Unterminated constructs end the parse with an error (a truncated file
+      // must not send indexOf() back to -1 and loop forever).
+      const upto = (end, what) => { const e = src.indexOf(end, i); if (e < 0) throw new Error('XML: unterminated ' + what + ' (is the file complete?)'); return e; };
+      if (src.startsWith('<?', i)) { i = upto('?>', '<?') + 2; continue; }
+      if (src.startsWith('<!--', i)) { i = upto('-->', 'comment') + 3; continue; }
+      if (src.startsWith('<![CDATA[', i)) { const e = upto(']]>', 'CDATA'); cur().text += src.slice(i + 9, e); i = e + 3; continue; }
+      if (src.startsWith('<!', i)) { i = upto('>', '<!') + 1; continue; }
       if (src[i + 1] === '/') {
-        const e = src.indexOf('>', i);
+        const e = upto('>', 'end tag');
         const name = src.slice(i + 2, e).trim().replace(/^.*:/, '');
         if (stack.length < 2 || cur().name !== name) throw new Error('XML: unexpected </' + name + '>');
         stack.pop();
@@ -148,8 +151,8 @@ END_IF;`,
     EOS_AI: {
       kind: 'function', ret: 'REAL',
       ins: [['RAW', 'UINT'], ['LO', 'REAL'], ['HI', 'REAL']],
-      doc: 'Analog input: OpenPLC delivers 0..65535 for 0..3.3 V.',
-      st: 'EOS_AI := LO + UINT_TO_REAL(RAW) / 65535.0 * (HI - LO);',
+      doc: 'Analog input: OpenPLC ESP32 boards deliver analogRead() x 16, so 0..3.3 V reads 0..65520.',
+      st: 'EOS_AI := LO + UINT_TO_REAL(RAW) / 65520.0 * (HI - LO);',
     },
     EOS_AO: {
       kind: 'function', ret: 'UINT',
@@ -169,20 +172,36 @@ END_IF;`,
     },
     EOS_BLINK: {
       kind: 'functionBlock',
-      ins: [['EN_IN', 'BOOL'], ['T_ON', 'TIME'], ['T_OFF', 'TIME']], outs: [['Q', 'BOOL']], locals: [['t_on_phase', 'TON'], ['t_off_phase', 'TON']],
-      doc: 'Blinker: while EN_IN is TRUE, Q is TRUE for T_ON then FALSE for T_OFF.',
-      st: `t_on_phase(IN := EN_IN AND NOT t_off_phase.Q, PT := T_ON);
-t_off_phase(IN := t_on_phase.Q, PT := T_OFF);
-Q := EN_IN AND NOT t_on_phase.Q;`,
+      ins: [['EN_IN', 'BOOL'], ['T_ON', 'TIME'], ['T_OFF', 'TIME']], outs: [['Q', 'BOOL']], locals: [['active', 'BOOL'], ['phase', 'TON']],
+      doc: 'Blinker: while EN_IN is TRUE, Q is TRUE for T_ON then FALSE for T_OFF. Each phase restarts in the scan the previous one ends, so the period is exact.',
+      st: `IF NOT EN_IN THEN
+  Q := FALSE;
+  active := FALSE;
+  phase(IN := FALSE);
+ELSIF NOT active THEN
+  active := TRUE;
+  Q := TRUE;
+  phase(IN := FALSE);
+  phase(IN := TRUE, PT := T_ON);
+ELSE
+  phase(IN := TRUE, PT := SEL(Q, T_OFF, T_ON));
+  IF phase.Q THEN
+    Q := NOT Q;
+    phase(IN := FALSE);
+    phase(IN := TRUE, PT := SEL(Q, T_OFF, T_ON));
+  END_IF;
+END_IF;`,
     },
     EOS_WEEK: {
       kind: 'functionBlock',
-      ins: [['DAYS', 'INT'], ['ON_MIN', 'INT'], ['OFF_MIN', 'INT'], ['DOW', 'INT'], ['MINUTE', 'INT']], outs: [['Q', 'BOOL']],
+      ins: [['DAYS', 'INT'], ['ON_MIN', 'INT'], ['OFF_MIN', 'INT'], ['DOW', 'INT'], ['MINUTE', 'INT'], ['VALID', 'BOOL']], outs: [['Q', 'BOOL']],
       locals: [['today', 'BOOL'], ['yesterday', 'BOOL']],
-      doc: 'Weekly timer. DAYS bit 0 = Sunday. DOW (0 = Sunday) and MINUTE (minute of the day) must come from a clock.',
+      doc: 'Weekly timer. DAYS bit 0 = Sunday. DOW (0 = Sunday) and MINUTE (minute of the day) must come from a clock; Q stays FALSE until VALID says the clock is set.',
       st: `today := (SHR(INT_TO_WORD(DAYS), DOW) AND 16#0001) <> 0;
 yesterday := (SHR(INT_TO_WORD(DAYS), (DOW + 6) MOD 7) AND 16#0001) <> 0;
-IF ON_MIN <= OFF_MIN THEN
+IF NOT VALID THEN
+  Q := FALSE;
+ELSIF ON_MIN <= OFF_MIN THEN
   Q := today AND MINUTE >= ON_MIN AND MINUTE < OFF_MIN;
 ELSE
   Q := (today AND MINUTE >= ON_MIN) OR (yesterday AND MINUTE < OFF_MIN);
@@ -227,7 +246,8 @@ END_IF;`,
   /**
    * @param prog EspressOS program
    * @param opts {name, date (ISO string), version}
-   * @returns {xml, warnings[], ioMap[{address, pin, block, kind}]}
+   * @returns {xml, warnings[], ioMap[{address, pin, block, kind}],
+   *           vars[{name, type, address, role}]} (role: which EspressOS input/output a variable stands for)
    */
   function exportPLCopen(prog, opts = {}) {
     const warnings = [];
@@ -303,13 +323,13 @@ END_IF;`,
         }
         case 'VIN': {
           const slider = b.ui === 'VSLIDER';
-          const v = declare('V' + p.idx + '_' + (p.name || ''), slider ? 'REAL' : 'BOOL', { doc: `EspressOS web ${slider ? 'setpoint' : (p.mode === 'button' ? 'push button' : 'switch')} slot ${p.idx}` });
+          const v = declare('V' + p.idx + '_' + (p.name || ''), slider ? 'REAL' : 'BOOL', { doc: `EspressOS web ${slider ? 'setpoint' : (p.mode === 'button' ? 'push button' : 'switch')} slot ${p.idx}`, role: { kind: 'vin', idx: Number(p.idx) } });
           setOut(b, 0, inVar(v, x, y, { eos }), null, slider ? 'REAL' : 'BOOL');
           break;
         }
         case 'DI': {
           const a = addr('IX');
-          const v = declare('DI_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin });
+          const v = declare('DI_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin, role: { kind: 'di', pin: Number(p.pin) } });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'digital input' });
           const iv = inVar(v, x, y, { eos });
           if (Number(p.inv)) {
@@ -322,7 +342,7 @@ END_IF;`,
         }
         case 'DO': {
           const a = addr('QX');
-          const v = declare('DO_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin });
+          const v = declare('DO_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin, role: { kind: 'do', pin: Number(p.pin) } });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'digital output' });
           const e = outVar(v, x, y, { eos });
           if (Number(p.inv)) {
@@ -334,7 +354,7 @@ END_IF;`,
         }
         case 'AI': {
           const a = addr('IW');
-          const v = declare('AI_B' + b.id + label(b), 'UINT', { address: a, doc: 'GPIO ' + p.pin });
+          const v = declare('AI_B' + b.id + label(b), 'UINT', { address: a, doc: 'GPIO ' + p.pin, role: { kind: 'ai', pin: Number(p.pin) } });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'analog input' });
           const raw = inVar(v, x - 130, y);
           libNeeded.add('EOS_AI');
@@ -347,9 +367,10 @@ END_IF;`,
         }
         case 'AO': {
           const a = addr('QW');
-          const v = declare('AO_B' + b.id + label(b), 'UINT', { address: a, doc: 'GPIO ' + p.pin + ' (PWM)' });
+          const v = declare('AO_B' + b.id + label(b), 'UINT', { address: a, doc: 'GPIO ' + p.pin + ' (PWM)', role: { kind: 'ao', block: b.id } });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'analog (PWM) output' });
           libNeeded.add('EOS_AO');
+          warnings.push(`B${b.id}: the PWM frequency (${Number(p.freq) || 1000} Hz) is not exported; OpenPLC drives %QW outputs at its board's own PWM frequency.`);
           const e = block('EOS_AO', x, y, ['PCT'], ['OUT'], { eos });
           need(e, 0, b, 0, 'REAL', '0.0');
           outVar(v, x + 160, y).src = { el: e, param: 'OUT' };
@@ -360,7 +381,7 @@ END_IF;`,
           const drv = dev && C.DRIVERS.find((d) => d.id === dev.driver);
           const chName = drv && drv.ch[p.ch] ? drv.ch[p.ch][0] : 'ch' + p.ch;
           const base = 'S_' + (dev ? dev.name || dev.driver : 'dev' + p.dev) + '_' + chName;
-          const v = declare(base, 'REAL', { doc: `EspressOS sensor ${dev ? dev.driver : '?'} channel ${chName}` });
+          const v = declare(base, 'REAL', { doc: `EspressOS sensor ${dev ? dev.driver : '?'} channel ${chName}`, role: { kind: 'sensor', dev: Number(p.dev), ch: Number(p.ch) } });
           setOut(b, 0, inVar(v, x, y, { eos }), null, 'REAL');
           const okName = declare(base + '_OK', 'BOOL', { init: 'TRUE', doc: 'TRUE while the sensor answers' });
           setOut(b, 1, inVar(okName, x, y + 40), null, 'BOOL');
@@ -424,16 +445,18 @@ END_IF;`,
         case 'WEEK': {
           libNeeded.add('EOS_WEEK');
           if (!names.has('CLOCK_DOW')) {
-            declare('CLOCK_DOW', 'INT', { doc: 'Day of week, 0 = Sunday. Set it from a real-time clock.' });
-            declare('CLOCK_MINUTE', 'INT', { doc: 'Minute of the day, 0..1439. Set it from a real-time clock.' });
-            warnings.push('Weekly timers need the time of day: set variables CLOCK_DOW and CLOCK_MINUTE from a real-time clock in your PLC.');
+            declare('CLOCK_DOW', 'INT', { doc: 'Day of week, 0 = Sunday. Set it from a real-time clock.', role: { kind: 'clock', part: 'dow' } });
+            declare('CLOCK_MINUTE', 'INT', { doc: 'Minute of the day, 0..1439. Set it from a real-time clock.', role: { kind: 'clock', part: 'minute' } });
+            declare('CLOCK_VALID', 'BOOL', { init: 'FALSE', role: { kind: 'clock', part: 'valid' }, doc: 'Set TRUE once CLOCK_DOW / CLOCK_MINUTE hold the real time; weekly timers stay off until then.' });
+            warnings.push('Weekly timers need the time of day: set CLOCK_DOW and CLOCK_MINUTE from a real-time clock in your PLC, then set CLOCK_VALID to TRUE. Until then they stay off.');
           }
-          const e = block('EOS_WEEK', x, y, ['DAYS', 'ON_MIN', 'OFF_MIN', 'DOW', 'MINUTE'], ['Q'], { eos, instance: fbInstance('EOS_WEEK', b) });
+          const e = block('EOS_WEEK', x, y, ['DAYS', 'ON_MIN', 'OFF_MIN', 'DOW', 'MINUTE', 'VALID'], ['Q'], { eos, instance: fbInstance('EOS_WEEK', b) });
           e.ins[0].src = { el: literal(String(Math.round(p.days)), x - 90, y) };
           e.ins[1].src = { el: literal(String(Math.round(p.on)), x - 90, y + 20) };
           e.ins[2].src = { el: literal(String(Math.round(p.off)), x - 90, y + 40) };
           e.ins[3].src = { el: inVar('CLOCK_DOW', x - 90, y + 60) };
           e.ins[4].src = { el: inVar('CLOCK_MINUTE', x - 90, y + 80) };
+          e.ins[5].src = { el: inVar('CLOCK_VALID', x - 90, y + 100) };
           setOut(b, 0, e, 'Q', 'BOOL');
           break;
         }
@@ -599,7 +622,8 @@ END_IF;`,
 
     const kindOrder = (a) => ['%IX', '%IW', '%QX', '%QW'].indexOf(a.slice(0, 3));
     ioMap.sort((a, b) => kindOrder(a.address) - kindOrder(b.address) || a.address.localeCompare(b.address, 'en', { numeric: true }));
-    return { xml: '<?xml version="1.0" encoding="utf-8"?>\n' + ser(project), warnings, ioMap };
+    return { xml: '<?xml version="1.0" encoding="utf-8"?>\n' + ser(project), warnings, ioMap,
+      vars: vars.map((v) => ({ name: v.name, type: v.type, address: v.address, role: v.role })) };
   }
 
   // =========================================================== IMPORT
@@ -724,7 +748,8 @@ END_IF;`,
     const PREFER = [4, 5, 13, 14, 16, 17, 18, 19, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39, 2, 12, 15];
     const pickPin = (list0, want, what, name) => {
       const list = PREFER.filter((p) => list0.includes(p));
-      if (want !== undefined && want !== null && !usedPins.has(Number(want))) { usedPins.add(Number(want)); return Number(want); }
+      if (want !== undefined && want !== null && list.includes(Number(want)) && !usedPins.has(Number(want))) { usedPins.add(Number(want)); return Number(want); }
+      if (want !== undefined && want !== null && !list.includes(Number(want))) warnings.push(`${what} ${name}: GPIO ${want} from the file cannot be used for this; another pin was picked.`);
       const free = list.find((p) => !usedPins.has(p) && !wantedPins.has(p));
       if (free === undefined) { warnings.push(`No free GPIO left for ${what} ${name}.`); return list[0]; }
       usedPins.add(free);
@@ -732,7 +757,8 @@ END_IF;`,
       return free;
     };
     const pickVin = (want) => {
-      if (want !== undefined && !usedVin.has(Number(want))) { usedVin.add(Number(want)); return Number(want); }
+      const w = Number(want);
+      if (want !== undefined && Number.isInteger(w) && w >= 0 && w <= 15 && !usedVin.has(w)) { usedVin.add(w); return w; }
       let i = 0; while ((usedVin.has(i) || wantedVin.has(i)) && i < 15) i++;
       usedVin.add(i);
       return i;
@@ -761,7 +787,7 @@ END_IF;`,
 
     // Inputs that EspressOS handles inside the block itself (clock, raw ADC value):
     // the variables feeding them do not become blocks.
-    const INTERNAL_INPUTS = { EOS_WEEK: ['DOW', 'MINUTE'], EOS_AI: ['RAW'] };
+    const INTERNAL_INPUTS = { EOS_WEEK: ['DOW', 'MINUTE', 'VALID'], EOS_AI: ['RAW'] };
     const consumed = new Set();
     for (const e of el.values()) {
       if (e.tag === 'block') {

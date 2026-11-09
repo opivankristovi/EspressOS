@@ -2,11 +2,12 @@ name: IEC 61131-3 compile check
 
 # Exports the example programs to PLCopen XML, converts them to Structured Text
 # with OpenPLC Editor's generator and compiles them with matiec (iec2c) and gcc,
-# the same toolchain OpenPLC uses. Fails if any step rejects an export.
+# the same toolchain OpenPLC uses. Then runs the compiled programs on random
+# inputs and checks that their outputs match EspressOS's engine scan by scan.
 
 on:
   push:
-    paths: ['web/js/plcopen.js', 'web/js/sim.js', 'examples/**', 'tools/export_plcopen.js', 'tools/plcopen_to_st.py', '.github/workflows/iec.yml']
+    paths: ['web/js/plcopen.js', 'web/js/sim.js', 'web/js/catalog.js', 'examples/**', 'tools/export_plcopen.js', 'tools/plcopen_to_st.py', 'tools/iec_behaviour.js', 'tools/test_plcopen.js', '.github/workflows/iec.yml']
   pull_request:
   workflow_dispatch:
 
@@ -45,6 +46,9 @@ jobs:
         working-directory: ../matiec
         run: autoreconf -i && ./configure && make -j"$(nproc)" && mkdir -p ../matiec-bin && cp iec2c ../matiec-bin/
 
+      - name: PLCopen tests with schema validation
+        run: PLCOPEN_XSD=../editor/plcopen/tc6_xml_v201.xsd node --test tools/test_plcopen.js
+
       - name: Export examples to PLCopen XML
         run: node tools/export_plcopen.js build/iec examples/*.json
 
@@ -65,6 +69,16 @@ jobs:
             echo "== $d"
             gcc -c -w -I ../matiec/lib/C -I "$d" "$d/Config0.c" -o "$d/Config0.o"
             gcc -c -w -I ../matiec/lib/C -I "$d" "$d/Res0.c" -o "$d/Res0.o"
+          done
+
+      - name: Same behaviour as EspressOS (random inputs, 3000 scan cycles)
+        run: |
+          for f in examples/*.json; do
+            d="build/iec/$(basename "$f" .json | tr - _)"
+            node tools/iec_behaviour.js prepare "$f" "$d"
+            gcc -w -I ../matiec/lib/C -I "$d" "$d/harness.c" "$d/Config0.c" "$d/Res0.c" -lm -o "$d/harness"
+            "$d/harness" < "$d/stim.txt" > "$d/actual.txt"
+            node tools/iec_behaviour.js compare "$d"
           done
 
       - uses: actions/upload-artifact@v4

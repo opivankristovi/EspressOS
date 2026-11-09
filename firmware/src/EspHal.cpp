@@ -5,10 +5,28 @@
 
 #include "Sensors.h"
 
-// Pins 6-11 are wired to the SPI flash on ESP32-WROOM modules; never touch them.
-bool EspHal::validPin(int pin) { return pin >= 0 && pin <= 39 && !(pin >= 6 && pin <= 11) && pin != 20 && pin != 24 && !(pin >= 28 && pin <= 31); }
-// 34-39 are input only.
-bool EspHal::outputCapable(int pin) { return validPin(pin) && pin < 34; }
+// Usable pins; keep in sync with OUT_PINS / IN_PINS / ADC_PINS in web/js/catalog.js.
+// Left out: 0, 1, 3 (boot strap and serial), 6-11 (SPI flash on WROOM modules).
+static const int kOutPins[] = {2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33};
+static const int kInOnlyPins[] = {34, 35, 36, 39};
+static const int kAdcPins[] = {32, 33, 34, 35, 36, 39};  // ADC1 only: ADC2 is unusable while Wi-Fi is on
+
+template <size_t N>
+static bool inList(const int (&list)[N], int pin) {
+  for (int p : list)
+    if (p == pin) return true;
+  return false;
+}
+
+bool EspHal::outputCapable(int pin) { return inList(kOutPins, pin); }
+bool EspHal::validPin(int pin) { return outputCapable(pin) || inList(kInOnlyPins, pin); }
+
+const char* EspHal::pinProblem(int pin, eos::PinUse use) {
+  if (!validPin(pin)) return "cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)";
+  if ((use == eos::PinUse::DigitalOut || use == eos::PinUse::PwmOut) && !outputCapable(pin)) return "is input-only";
+  if (use == eos::PinUse::AnalogIn && !inList(kAdcPins, pin)) return "has no usable ADC (use 32-36 or 39)";
+  return nullptr;
+}
 
 void EspHal::setupInput(int pin, bool pullup) {
   if (!validPin(pin)) return;

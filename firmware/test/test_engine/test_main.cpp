@@ -20,6 +20,11 @@ struct FakeHal : Hal {
   void writeDigital(int pin, bool v) override { dout[pin] = v; }
   float readVirtual(int i) override { return vin[i]; }
   void safeOutputs() override { safeCalls++; dout.clear(); }
+  const char* pinProblem(int pin, PinUse use) override {
+    if (pin == 7) return "belongs to the flash chip";
+    if (pin == 34 && use == PinUse::DigitalOut) return "is input-only";
+    return nullptr;
+  }
 };
 
 static FakeHal hal;
@@ -202,6 +207,23 @@ void test_inverted_output_starts_at_off_level() {
   TEST_ASSERT_TRUE(hal.dout[5]);
 }
 
+static std::string loadErr(const char* json) {
+  std::string err;
+  TEST_ASSERT_FALSE_MESSAGE(eng->load(json, err), "program should be rejected");
+  return err;
+}
+
+void test_bad_pins_rejected() {
+  TEST_ASSERT_EQUAL_STRING("Block 1: GPIO 7 belongs to the flash chip", loadErr(R"({"blocks":[{"id":1,"type":"DO","p":{"pin":7}}],"wires":[]})").c_str());
+  TEST_ASSERT_EQUAL_STRING("Block 2: GPIO 34 is input-only", loadErr(R"({"blocks":[{"id":2,"type":"DO","p":{"pin":34}}],"wires":[]})").c_str());
+  TEST_ASSERT_EQUAL_STRING("Block 3 has no GPIO pin", loadErr(R"({"blocks":[{"id":3,"type":"DI","p":{}}],"wires":[]})").c_str());
+  TEST_ASSERT_EQUAL_STRING("GPIO 4 is used by block 1 and block 2",
+                           loadErr(R"({"blocks":[{"id":1,"type":"DI","p":{"pin":4}},{"id":2,"type":"DO","p":{"pin":4}}],"wires":[]})").c_str());
+  // two inputs may share a pin
+  std::string err;
+  TEST_ASSERT_TRUE(eng->load(R"({"blocks":[{"id":1,"type":"DI","p":{"pin":4}},{"id":2,"type":"DI","p":{"pin":4}}],"wires":[]})", err));
+}
+
 void test_snapshot_json() {
   load(R"({"blocks":[{"id":5,"type":"CONST","p":{"value":2.5}}],"wires":[]})");
   eng->scan(0);
@@ -224,5 +246,6 @@ int main() {
   RUN_TEST(test_stop_then_run_restores_outputs_and_fresh_state);
   RUN_TEST(test_inverted_output_starts_at_off_level);
   RUN_TEST(test_snapshot_json);
+  RUN_TEST(test_bad_pins_rejected);
   return UNITY_END();
 }

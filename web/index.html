@@ -95,7 +95,8 @@
           <label>Admin password for this page<input name="adminPass" type="password" placeholder="unchanged" autocomplete="new-password"></label>
           <label>Time zone (POSIX)<input name="tz"></label>
           <div class="row"><label>I²C SDA<input name="sda" type="number"></label><label>I²C SCL<input name="scl" type="number"></label></div>
-          <p class="muted small">Network, password and I²C changes take effect after a reboot.</p>
+          <p class="muted small">Network and I²C changes take effect after a reboot; a new admin password right away.</p>
+          <p class="small" id="apKeyInfo" hidden>If the board cannot reach your Wi-Fi for 2 minutes, it opens its own <b>EspressOS-…</b> network so you can still get in. Its password: <code id="apKey"></code></p>
           <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="btnReboot">Reboot board</button></div>
         </form>
         <div class="card">

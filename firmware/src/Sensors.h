@@ -13,6 +13,8 @@ constexpr int kMaxChannels = 4;
 void begin(int sda, int scl);
 // Checks drivers/limits without touching running devices.
 bool validate(JsonArrayConst devices, String& err);
+// True if any device talks over the I2C bus (everything except 1-Wire).
+bool usesI2c(JsonArrayConst devices);
 // Replaces all devices (call validate() first). The caller must make sure the
 // engine is not scanning (value() is lock-free).
 void configure(JsonArrayConst devices);
@@ -22,7 +24,7 @@ float value(int devId, int channel, bool* ok);
 String statusJson();
 // JSON array of compiled-in driver ids.
 String driversJson();
-// JSON: {"sda":21,"scl":22,"found":[118,35]}
+// JSON: {"sda":21,"scl":22,"found":[118,35]}, plus "error" if the bus is stuck
 String i2cScanJson();
 
 }  // namespace Sensors

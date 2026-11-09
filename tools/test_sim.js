@@ -160,3 +160,23 @@ test('catalogue matches firmware block table', () => {
   assert.equal(fw.length, Object.keys(N_IN).length);
   for (const [t, i, o] of fw) { assert.equal(N_IN[t], i, t); assert.equal(N_OUT[t], o, t); }
 });
+
+test('engine rejects unusable, input-only and shared pins', () => {
+  const load = (blocks) => new Engine(new NullHal()).load({ blocks, wires: [] });
+  assert.match(load([{ id: 1, type: 'DO', p: { pin: 7 } }]), /Block 1: GPIO 7 cannot be used/);
+  assert.match(load([{ id: 1, type: 'DO', p: { pin: 34 } }]), /input-only/);
+  assert.match(load([{ id: 1, type: 'AI', p: { pin: 4 } }]), /no usable ADC/);
+  assert.match(load([{ id: 1, type: 'DI', p: {} }]), /no GPIO pin/);
+  assert.match(load([{ id: 1, type: 'DI', p: { pin: 4 } }, { id: 2, type: 'DO', p: { pin: 4 } }]), /GPIO 4 is used by block 1 and block 2/);
+  assert.equal(load([{ id: 1, type: 'DI', p: { pin: 4 } }, { id: 2, type: 'DI', p: { pin: 4 } }]), null);
+});
+
+test('pin lists match the firmware (EspHal.cpp)', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '../firmware/src/EspHal.cpp'), 'utf8');
+  const list = (name) => src.match(new RegExp(name + String.raw`\[\] = \{([^}]*)\}`))[1].split(',').map(Number);
+  const C = require('../web/js/catalog.js');
+  assert.deepEqual(list('kOutPins'), C.OUT_PINS);
+  assert.deepEqual([...list('kOutPins'), ...list('kInOnlyPins')].sort((a, b) => a - b), C.IN_PINS);
+  assert.deepEqual(list('kAdcPins'), C.ADC_PINS);
+});

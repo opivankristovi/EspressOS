@@ -209,6 +209,8 @@ test('clear errors for files EspressOS cannot use', () => {
   assert.throws(() => P.importPLCopen(st), /FBD.*ST/);
   assert.throws(() => P.importPLCopen('<project><a></b></project>'), /XML/);
   assert.throws(() => P.importPLCopen('<hello/>'), /PLCopen/);
+  // truncated files end with an error instead of hanging
+  for (const t of ['<a><?pi', '<a><![CDATA[x', '<a></a', '<a><!-- x']) assert.throws(() => P.importPLCopen(t), /unterminated/);
 });
 
 test('exports validate against the PLCopen TC6 v2.01 schema', (t) => {
@@ -218,6 +220,26 @@ test('exports validate against the PLCopen TC6 v2.01 schema', (t) => {
   const files = [allBlocks, greenhouse].map((p, i) => { const f = path.join(dir, `p${i}.xml`); fs.writeFileSync(f, exp(p).xml); return f; });
   const f2 = path.join(dir, 'foreign.xml');
   fs.writeFileSync(f2, foreign);
-  const r = spawnSync('python', [path.join(__dirname, 'validate_plcopen.py'), xsd, ...files], { encoding: 'utf8' });
+  const r = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [path.join(__dirname, 'validate_plcopen.py'), xsd, ...files], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('import keeps pins and web slots from the file only when they are usable', () => {
+  const x = exp({ version: 1, cycleMs: 10, devices: [], blocks: [
+    { id: 1, type: 'VIN', ui: 'VSWITCH', x: 0, y: 0, p: { idx: 0, mode: 'switch', name: 'a' } },
+    { id: 2, type: 'DO', x: 200, y: 0, p: { pin: 16, inv: 0 } }], wires: [[1, 0, 2, 0]] }).xml
+    .replace('&quot;pin&quot;:16', '&quot;pin&quot;:7').replace('&quot;idx&quot;:0', '&quot;idx&quot;:99');
+  const r = P.importPLCopen(x);
+  const dout = r.prog.blocks.find((b) => b.type === 'DO'), vin = r.prog.blocks.find((b) => b.type === 'VIN');
+  assert.notEqual(dout.p.pin, 7);
+  assert.ok(require('../web/js/catalog.js').OUT_PINS.includes(dout.p.pin));
+  assert.ok(vin.p.idx >= 0 && vin.p.idx <= 15);
+  assert.ok(r.warnings.some((w) => /GPIO 7 from the file cannot be used/.test(w)));
+});
+
+test('weekly timers stay off in IEC until the clock is marked valid', () => {
+  const r = exp(allBlocks);
+  assert.ok(r.xml.includes('<variable name="CLOCK_VALID">'));
+  assert.ok(/IF NOT VALID THEN\s+Q := FALSE;/.test(r.xml));
+  assert.ok(r.warnings.some((w) => /CLOCK_VALID/.test(w)));
 });

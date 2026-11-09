@@ -20,6 +20,7 @@ class EspHal : public eos::Hal {
   bool timeOfDay(int* dow, int* minuteOfDay) override;
   float readVirtual(int idx) override { return idx >= 0 && idx < kVirtual ? vin[idx] : 0; }
   void safeOutputs() override;
+  const char* pinProblem(int pin, eos::PinUse use) override;
 
   static bool validPin(int pin);
   static bool outputCapable(int pin);
