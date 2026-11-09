@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project xmlns="http://www.plcopen.org/xml/tc6_0201" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <fileHeader companyName="EspressOS" productName="EspressOS" productVersion="0.1.0" creationDateTime="2026-11-09T12:00:00"/>
-  <contentHeader name="Greenhouse" modificationDateTime="2026-11-09T12:00:00">
+  <contentHeader name="greenhouse" modificationDateTime="2026-11-09T12:00:00">
     <coordinateInfo>
       <fbd>
         <scaling x="1" y="1"/>
@@ -32,9 +32,7 @@
         </interface>
         <body>
           <ST>
-            <xhtml:p>
-              <![CDATA[EOS_AO := REAL_TO_UINT(LIMIT(0.0, PCT, 100.0) * 655.35);]]>
-            </xhtml:p>
+            <xhtml:p><![CDATA[EOS_AO := REAL_TO_UINT(LIMIT(0.0, PCT, 100.0) * 655.35);]]></xhtml:p>
           </ST>
         </body>
         <documentation>
@@ -82,11 +80,9 @@
         </interface>
         <body>
           <ST>
-            <xhtml:p>
-              <![CDATA[t_on_phase(IN := EN_IN AND NOT t_off_phase.Q, PT := T_ON);
+            <xhtml:p><![CDATA[t_on_phase(IN := EN_IN AND NOT t_off_phase.Q, PT := T_ON);
 t_off_phase(IN := t_on_phase.Q, PT := T_OFF);
-Q := EN_IN AND NOT t_on_phase.Q;]]>
-            </xhtml:p>
+Q := EN_IN AND NOT t_on_phase.Q;]]></xhtml:p>
           </ST>
         </body>
         <documentation>
@@ -133,16 +129,14 @@ Q := EN_IN AND NOT t_on_phase.Q;]]>
         </interface>
         <body>
           <ST>
-            <xhtml:p>
-              <![CDATA[IF IN_MAX = IN_MIN THEN
+            <xhtml:p><![CDATA[IF IN_MAX = IN_MIN THEN
   EOS_SCALE := OUT_MIN;
 ELSE
   EOS_SCALE := OUT_MIN + (IN - IN_MIN) * (OUT_MAX - OUT_MIN) / (IN_MAX - IN_MIN);
   IF CLAMP THEN
     EOS_SCALE := LIMIT(MIN(OUT_MIN, OUT_MAX), EOS_SCALE, MAX(OUT_MIN, OUT_MAX));
   END_IF;
-END_IF;]]>
-            </xhtml:p>
+END_IF;]]></xhtml:p>
           </ST>
         </body>
       </pou>
@@ -175,13 +169,11 @@ END_IF;]]>
         </interface>
         <body>
           <ST>
-            <xhtml:p>
-              <![CDATA[IF ON_LEVEL >= OFF_LEVEL THEN
+            <xhtml:p><![CDATA[IF ON_LEVEL >= OFF_LEVEL THEN
   IF IN >= ON_LEVEL THEN Q := TRUE; ELSIF IN <= OFF_LEVEL THEN Q := FALSE; END_IF;
 ELSE
   IF IN <= ON_LEVEL THEN Q := TRUE; ELSIF IN >= OFF_LEVEL THEN Q := FALSE; END_IF;
-END_IF;]]>
-            </xhtml:p>
+END_IF;]]></xhtml:p>
           </ST>
         </body>
         <documentation>
@@ -239,15 +231,13 @@ END_IF;]]>
         </interface>
         <body>
           <ST>
-            <xhtml:p>
-              <![CDATA[today := (SHR(INT_TO_WORD(DAYS), DOW) AND 16#0001) <> 0;
+            <xhtml:p><![CDATA[today := (SHR(INT_TO_WORD(DAYS), DOW) AND 16#0001) <> 0;
 yesterday := (SHR(INT_TO_WORD(DAYS), (DOW + 6) MOD 7) AND 16#0001) <> 0;
 IF ON_MIN <= OFF_MIN THEN
   Q := today AND MINUTE >= ON_MIN AND MINUTE < OFF_MIN;
 ELSE
   Q := (today AND MINUTE >= ON_MIN) OR (yesterday AND MINUTE < OFF_MIN);
-END_IF;]]>
-            </xhtml:p>
+END_IF;]]></xhtml:p>
           </ST>
         </body>
         <documentation>

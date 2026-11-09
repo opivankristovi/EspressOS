@@ -79,6 +79,9 @@
     const attrs = Object.entries(n.attrs).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => ` ${k}="${esc(v)}"`).join('');
     if (!n.kids.length) return `${ind}<${n.name}${attrs}/>\n`;
     if (n.kids.length === 1 && typeof n.kids[0] === 'string') return `${ind}<${n.name}${attrs}>${esc(n.kids[0])}</${n.name}>\n`;
+    // Text content (e.g. ST in <xhtml:p><![CDATA[..]]>) stays inline: OpenPLC/Beremiz read
+    // only the element's leading text, so added indentation would hide the code.
+    if (n.kids.length === 1 && n.kids[0].raw !== undefined) return `${ind}<${n.name}${attrs}>${n.kids[0].raw}</${n.name}>\n`;
     return `${ind}<${n.name}${attrs}>\n${n.kids.map((k) => ser(k, ind + '  ')).join('')}${ind}</${n.name}>\n`;
   }
 
