@@ -46,7 +46,14 @@
       this.render();
       this.opts.onSelect(null);
     }
-    nextId() { return this.prog.blocks.reduce((m, b) => Math.max(m, b.id), 0) + 1; }
+    // Ids are never reused (deleted ids stay retired), so live values and
+    // saved references can't silently attach to a different block.
+    nextId() {
+      const max = this.prog.blocks.reduce((m, b) => Math.max(m, b.id), 0);
+      const id = Math.max(max, this.prog.lastId || 0) + 1;
+      this.prog.lastId = id;
+      return id;
+    }
     block(id) { return this.prog.blocks.find((b) => b.id === id); }
     checkpoint() { this.hist.push(JSON.stringify(this.prog)); if (this.hist.length > 100) this.hist.shift(); this.fut = []; }
     changed() { this.render(); this.opts.onChange(this.prog); }
@@ -92,8 +99,10 @@
       const src = this.block(this.sel.id);
       const def = C.blockDef(src);
       const b = this.addBlock(def, src.x + 30, src.y + 30);
+      const freeSlot = b.p.idx;  // addBlock picked a slot no other web control uses
       b.p = JSON.parse(JSON.stringify(src.p));
-      if (def.type === 'VIN') b.p.idx = Math.min(15, this.prog.blocks.filter((q) => q.type === 'VIN').length - 1);
+      if (def.type === 'VIN') b.p.idx = freeSlot;
+      if (src.note) b.note = src.note;
       this.changed();
     }
     updateParams(id, p, note) {
@@ -244,8 +253,10 @@
       if (on !== undefined) this.liveOn = on;
       this.applyLive();
     }
+    // paused = editor differs from the deployed program, so ids may not match what runs.
+    setLivePaused(p) { if (this.livePaused !== p) { this.livePaused = p; this.applyLive(); } }
     applyLive() {
-      const L = this.liveOn && this.live && this.live.b ? this.live.b : null;
+      const L = this.liveOn && !this.livePaused && this.live && this.live.b ? this.live.b : null;
       for (const r of this.refs.wires) {
         const v = L && L[r.w[0]] ? L[r.w[0]][r.w[1]] : undefined;
         r.path.classList.toggle('on', !!L && r.t === 'd' && v >= 0.5);
@@ -308,7 +319,7 @@
           }
         } else if (blk) {
           const b = this.block(Number(blk.dataset.id));
-          if (this.liveOn && this.live && blk.classList.contains('clickable') && this.opts.onBlockClick) {
+          if (this.liveOn && !this.livePaused && this.live && blk.classList.contains('clickable') && this.opts.onBlockClick) {
             drag = { kind: 'press', b, sx: e.clientX, sy: e.clientY, ox: b.x, oy: b.y, pw, moved: false };
             this.opts.onBlockClick(b, true);
           } else {
@@ -319,6 +330,7 @@
           this.select({ kind: 'wire', index: Number(wire.dataset.wire) });
         } else {
           this.select(null);
+          if (this.opts.onBackground) this.opts.onBackground();
           drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: this.view.x, vy: this.view.y };
         }
         if (drag) svg.setPointerCapture(e.pointerId);

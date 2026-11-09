@@ -1,6 +1,9 @@
-// Fake EspressOS board for UI development: node tools/mock_server.js [port]
+// Fake EspressOS board for UI development: node tools/mock_server.js [port] [--configured]
 // Serves web/ and implements the REST API with the JS engine. No WebSocket,
 // so the UI falls back to polling /api/monitor (also exercises that path).
+// Mirrors the firmware's request rules: writes need the X-EOS header, and in
+// setup mode (no admin password yet) only POST /api/config is accepted.
+// It does NOT implement HTTP Basic auth: --configured just skips setup mode.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +30,8 @@ class MockHal extends NullHal {
 const engine = new Engine(new MockHal());
 let program = { version: 1, cycleMs: 10, blocks: [], wires: [], devices: [] };
 let lastError = '';
+let hasAdminPass = process.argv.includes('--configured');
+const validI2c = (a, b) => Number.isInteger(a) && Number.isInteger(b) && a !== b && [a, b].every((p) => p >= 0 && p < 34 && !(p >= 6 && p <= 11) && ![20, 24, 28, 29, 30, 31].includes(p));
 const t0 = Date.now();
 setInterval(() => engine.scan(Date.now() - t0), 10);
 
@@ -37,7 +42,7 @@ function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'applicati
 
 const routes = {
   'GET /api/info': () => ({ version: '0.1.0-mock', uptime: Math.round((Date.now() - t0) / 1000), heap: 182000, ap: false, ip: '127.0.0.1', rssi: -55,
-    host: 'mock', running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true }),
+    host: 'mock', setup: !hasAdminPass, running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true }),
   'GET /api/program': () => program,
   'POST /api/program': (b) => {
     let p; try { p = JSON.parse(b); } catch (e) { return { status: 400, body: { ok: false, err: 'JSON: ' + e.message } }; }
@@ -60,14 +65,25 @@ const routes = {
   },
   'GET /api/drivers': () => ['BME280', 'SHT31', 'BH1750', 'DS18B20', 'ADS1115', 'I2C_GENERIC'],
   'GET /api/i2c/scan': () => ({ sda: 21, scl: 22, found: [0x23, 0x3c, 0x76] }),
-  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass: false }),
-  'POST /api/config': () => ({ ok: true }),
+  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass }),
+  'POST /api/config': (b) => {
+    let d; try { d = JSON.parse(b); } catch { return { status: 400, body: { ok: false, err: 'Bad JSON' } }; }
+    if (!hasAdminPass && !d.adminPass) return { status: 400, body: { ok: false, err: 'Choose an admin password first' } };
+    if (d.adminPass !== undefined && String(d.adminPass).length < 8) return { status: 400, body: { ok: false, err: 'Admin password needs at least 8 characters' } };
+    if (!validI2c(d.sda ?? 21, d.scl ?? 22)) return { status: 400, body: { ok: false, err: 'I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)' } };
+    if (d.adminPass) hasAdminPass = true;
+    return { ok: true };
+  },
   'POST /api/reboot': () => ({ ok: true }),
 };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const key = req.method + ' ' + url.pathname;
+  if (url.pathname.startsWith('/api/') && req.method !== 'GET') {
+    if (!req.headers['x-eos']) return json(res, 403, { ok: false, err: 'Missing X-EOS header' });
+    if (!hasAdminPass && url.pathname !== '/api/config') return json(res, 403, { ok: false, err: 'Set an admin password first (Settings)' });
+  }
   if (routes[key]) {
     const r = routes[key](await body(req));
     return r && r.status ? json(res, r.status, r.body) : json(res, 200, r);

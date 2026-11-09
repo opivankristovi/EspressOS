@@ -111,16 +111,27 @@ bool Engine::load(const char* json, std::string& err) {
   if (cycleMs_ > 1000) cycleMs_ = 1000;
   cycles_ = 0;
   for (Block* b : order_) b->begin(hal_);
+  if (src_.c_str() != json) src_ = json;
   err.clear();
   return true;
 }
 
 void Engine::clear() {
   hal_.safeOutputs();
+  src_.clear();
   blocks_.clear();
   order_.clear();
   sig_.clear();
   running_ = false;
+}
+
+void Engine::run() {
+  if (running_) return;
+  if (!src_.empty()) {
+    std::string err, src = src_;
+    load(src.c_str(), err);  // fresh block state + outputs set up again
+  }
+  running_ = true;
 }
 
 void Engine::stop() {

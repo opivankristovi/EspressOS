@@ -20,7 +20,8 @@ struct DI : Block {
 struct DO : Block {
   int pin; bool inv; int last = -1;
   explicit DO(const Params& p) : pin((int)p.num("pin", -1)), inv(p.num("inv", 0) != 0) {}
-  void begin(Hal& h) override { if (pin >= 0) h.setupOutput(pin); last = -1; }
+  // off state: logic 0 -> pin level = inv
+  void begin(Hal& h) override { if (pin >= 0) h.setupOutput(pin, inv); last = inv ? 1 : 0; }
   void eval(Ctx& c) override {
     bool on = inb(c, 0);
     int v = (on != inv) ? 1 : 0;  // pin level

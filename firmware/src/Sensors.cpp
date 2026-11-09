@@ -11,6 +11,8 @@
 
 #include <memory>
 
+#include "EspHal.h"
+
 namespace Sensors {
 namespace {
 
@@ -215,6 +217,12 @@ bool validate(JsonArrayConst devices, String& err) {
     bool found = false;
     for (const auto& e : kDrivers) if (strcmp(e.id, drv) == 0) found = true;
     if (!found) { err = String("Driver '") + drv + "' is not built into this firmware"; return false; }
+    if (strcmp(drv, "DS18B20") == 0 && !EspHal::outputCapable(d["pin"] | -1)) {
+      err = "DS18B20 needs an output-capable data pin (not 6-11 or 34-39)";
+      return false;
+    }
+    int addr = d["addr"] | 0;
+    if (addr < 0 || addr > 127) { err = "I2C address must be 0x00-0x7F"; return false; }
   }
   return true;
 }

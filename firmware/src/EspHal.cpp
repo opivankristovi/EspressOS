@@ -1,5 +1,6 @@
 #include "EspHal.h"
 
+#include <driver/gpio.h>
 #include <time.h>
 
 #include "Sensors.h"
@@ -14,10 +15,13 @@ void EspHal::setupInput(int pin, bool pullup) {
   pinMode(pin, pullup && pin < 34 ? INPUT_PULLUP : INPUT);
 }
 
-void EspHal::setupOutput(int pin) {
+void EspHal::setupOutput(int pin, bool level) {
   if (!outputCapable(pin)) return;
+  // Latch the off level before the driver is enabled: an active-low relay
+  // must not see LOW (= on) even for a moment.
+  gpio_set_level((gpio_num_t)pin, level ? 1 : 0);
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
+  digitalWrite(pin, level ? HIGH : LOW);
   outMask_ |= 1ULL << pin;
 }
 

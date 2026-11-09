@@ -9,11 +9,20 @@
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeout);
     try {
+      const headers = {};
+      if (method !== 'GET') headers['X-EOS'] = '1';  // CSRF guard: the board rejects writes without it
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
       const r = await fetch(url, {
-        method, signal: ctl.signal,
-        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        method, signal: ctl.signal, headers,
         body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
       });
+      let reauthTried = false;
+      try { reauthTried = !!sessionStorage.getItem('eos.reauth'); } catch { /* storage unavailable */ }
+      if (r.status === 401 && !reauthTried) {
+        // password was just set or changed: reload so the browser asks for it
+        try { sessionStorage.setItem('eos.reauth', '1'); } catch { /* ignore */ }
+        location.reload();
+      } else if (r.ok) { try { sessionStorage.removeItem('eos.reauth'); } catch { /* ignore */ } }
       const txt = await r.text();
       let data; try { data = JSON.parse(txt); } catch { data = txt; }
       if (!r.ok && !(data && data.err)) throw new Error('HTTP ' + r.status);
@@ -41,6 +50,7 @@
         fd.append('update', file, file.name);
         const x = new XMLHttpRequest();
         x.open('POST', '/api/ota');
+        x.setRequestHeader('X-EOS', '1');
         x.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
         x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch { reject(new Error('HTTP ' + x.status)); } };
         x.onerror = () => reject(new Error('Upload failed'));
@@ -79,6 +89,7 @@
   class SimHal extends root.Sim.NullHal {
     constructor(be) { super(); this.be = be; this.din = {}; this.ain = {}; this.dout = {}; this.pwm = {}; }
     readDigital(p) { return !!this.din[p]; }
+    setupOutput(p, level) { this.dout[p] = level ? 1 : 0; }
     writeDigital(p, v) { this.dout[p] = v ? 1 : 0; }
     readAnalog(p) { return this.ain[p] || 0; }
     writePwm(p, d) { this.pwm[p] = d; }
@@ -168,17 +179,24 @@
     setSensor(dev, ch, v) { const s = this.sensors[dev]; if (s) { s.manual = true; s.v[ch] = v; } }
   }
 
-  async function connect() {
-    const forceSim = /[?&]sim\b/.test(location.search) || location.protocol === 'file:';
-    if (!forceSim) {
-      try {
-        const be = new DeviceBackend();
-        const info = await http('GET', '/api/info', undefined, 2500);
-        if (info && typeof info === 'object' && 'version' in info) return be;
-      } catch { /* no board */ }
-    }
-    return new SimBackend();
+  async function probe(timeout) {
+    try {
+      const info = await http('GET', '/api/info', undefined, timeout);
+      return info && typeof info === 'object' && 'version' in info;
+    } catch { return false; }
   }
 
-  root.Api = { connect, EMPTY };
+  // Returns {be, reason}: reason is 'forced' (?sim / file://), 'board', or
+  // 'unreachable' (the board did not answer after several tries).
+  async function connect() {
+    const forced = /[?&]sim\b/.test(location.search) || location.protocol === 'file:';
+    if (forced) return { be: new SimBackend(), reason: 'forced' };
+    // A busy or freshly rebooted board can be slow: try a few times, longer each time.
+    for (const t of [3000, 5000, 8000]) {
+      if (await probe(t)) return { be: new DeviceBackend(), reason: 'board' };
+    }
+    return { be: new SimBackend(), reason: 'unreachable' };
+  }
+
+  root.Api = { connect, probe, EMPTY };
 })(this);

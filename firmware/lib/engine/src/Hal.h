@@ -9,7 +9,9 @@ class Hal {
  public:
   virtual ~Hal() {}
   virtual void setupInput(int pin, bool pullup) { (void)pin; (void)pullup; }
-  virtual void setupOutput(int pin) { (void)pin; }
+  // Configure pin as output, driving `level` from the very first instant
+  // (so active-low relays never see a glitch).
+  virtual void setupOutput(int pin, bool level) { (void)pin; (void)level; }
   virtual bool readDigital(int pin) { (void)pin; return false; }
   virtual void writeDigital(int pin, bool v) { (void)pin; (void)v; }
   // Returns raw ADC reading (ESP32: 0..4095).

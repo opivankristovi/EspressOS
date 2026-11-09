@@ -13,7 +13,9 @@ using namespace eos;
 struct FakeHal : Hal {
   std::map<int, bool> din, dout;
   std::map<int, float> vin;
+  std::map<int, bool> setupLevel;  // level an output was configured with
   int safeCalls = 0;
+  void setupOutput(int pin, bool level) override { setupLevel[pin] = level; dout[pin] = level; }
   bool readDigital(int pin) override { return din[pin]; }
   void writeDigital(int pin, bool v) override { dout[pin] = v; }
   float readVirtual(int i) override { return vin[i]; }
@@ -177,6 +179,29 @@ void test_inverted_output_pin_level_vs_state() {
   TEST_ASSERT_TRUE(hal.dout[5]);
 }
 
+void test_stop_then_run_restores_outputs_and_fresh_state() {
+  load(R"({"blocks":[{"id":1,"type":"CONST","p":{"value":1}},{"id":2,"type":"DO","p":{"pin":4}},
+          {"id":3,"type":"TON","p":{"t":2}}],"wires":[[1,0,2,0],[1,0,3,0]]})");
+  eng->scan(0);
+  eng->scan(1500);
+  TEST_ASSERT_TRUE(hal.dout[4]);
+  eng->stop();
+  TEST_ASSERT_FALSE(hal.dout[4]);
+  eng->run();
+  eng->scan(10000);  // timer must restart, not fire from its old start time
+  TEST_ASSERT_TRUE(hal.dout[4]);  // output re-armed and driven again
+  TEST_ASSERT_EQUAL_FLOAT(0, eng->output(3, 0));
+  eng->scan(12000);
+  TEST_ASSERT_EQUAL_FLOAT(1, eng->output(3, 0));
+}
+
+void test_inverted_output_starts_at_off_level() {
+  load(R"({"blocks":[{"id":1,"type":"DO","p":{"pin":5,"inv":1}}],"wires":[]})");
+  TEST_ASSERT_TRUE(hal.setupLevel.count(5) && hal.setupLevel[5]);  // HIGH = active-low relay off
+  eng->scan(0);
+  TEST_ASSERT_TRUE(hal.dout[5]);
+}
+
 void test_snapshot_json() {
   load(R"({"blocks":[{"id":5,"type":"CONST","p":{"value":2.5}}],"wires":[]})");
   eng->scan(0);
@@ -196,6 +221,8 @@ int main() {
   RUN_TEST(test_invalid_programs_rejected_and_old_kept);
   RUN_TEST(test_stop_sets_outputs_safe);
   RUN_TEST(test_inverted_output_pin_level_vs_state);
+  RUN_TEST(test_stop_then_run_restores_outputs_and_fresh_state);
+  RUN_TEST(test_inverted_output_starts_at_off_level);
   RUN_TEST(test_snapshot_json);
   return UNITY_END();
 }

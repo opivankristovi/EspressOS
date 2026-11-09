@@ -62,8 +62,8 @@ cd firmware && pio run -t upload && pio run -t uploadfs
 ```
 
 1. The board starts a Wi-Fi network called `EspressOS-XXXX`. Join it and the setup page opens (or browse to `192.168.4.1`).
-2. Under **Settings**, enter your Wi-Fi details, save, and reboot.
-3. Open `http://espressos.local` and start dragging blocks.
+2. **Choose an admin password** (the board accepts no programs until you do), and optionally enter your Wi-Fi details. The board restarts and joins your network.
+3. Open `http://espressos.local`, log in as `admin`, and start dragging blocks.
 
 Pin notes: I²C defaults to SDA 21 / SCL 22 (changeable in Settings). GPIO 6–11 are never offered because they're wired to flash. GPIO 34–39 are input-only. Analog inputs use ADC1 pins, since ADC2 is unavailable while Wi-Fi is on.
 
@@ -80,13 +80,24 @@ Browser ──HTTP/WebSocket──► ESP32
 
 A program is plain JSON: blocks, wires `[fromId, fromPort, toId, toPort]` and sensor devices. You can version it in git or share it like the [greenhouse example](examples/greenhouse.json). On deploy the board validates it and sorts the blocks so each runs after its inputs. Feedback loops are allowed and read the previous cycle's value, as on a PLC.
 
+**Run and Stop behave like a PLC.** Stop releases every output (pins go high-impedance, so active-high and active-low relay boards both drop out). Run restarts the program from a clean state: timers, counters and latches reset, and outputs are set up again at their *off* level, so active-low relays never glitch on.
+
+**Security.** The board drives real outputs, so the web API is locked down:
+- An admin password is required before the board accepts any program. It is stored as a salted SHA-256 hash, and changes take effect immediately.
+- Every request is checked *before* the board touches flash or allocates memory. That includes firmware uploads, which the web server library streams before its own auth middleware runs.
+- Writes must carry an `X-EOS` header and a matching `Origin`. A web page from another site can't send that header without a CORS preflight, which the board never approves, so such pages can't switch relays. API calls under a foreign `Host` name are refused, which blocks DNS rebinding.
+- Request bodies over 64 KB, or of unknown size (chunked), are refused. Settings that could brick the board, like I²C or 1-Wire on flash pins, are rejected.
+- After a power cut, the board keeps retrying your router for 2 minutes before opening its setup network. It closes that network again once the router is back.
+
+Known limits: HTTP Basic auth over plain HTTP, so use it on a network you trust. The Wi-Fi password is stored readably, because the board needs it to connect. Firmware images aren't signed; ESP32 secure boot and flash encryption are the proper fix for both.
+
 **Adding a sensor driver.** The ESP32 can't compile code itself, so drivers are built into the firmware. To add one, write a small class in `firmware/src/Sensors.cpp`, list it in `DRIVERS` in `web/js/catalog.js`, rebuild, and upload `firmware.bin` from **Settings → Firmware update**. Until then, the generic I²C block handles many simple chips.
 
 ## Development
 
 | What | Command |
 |---|---|
-| Editor against a fake board | `npm run mock`, then open http://localhost:8080 |
+| Editor against a fake board | `npm run mock`, then open http://localhost:8080 (starts in first-run setup mode; add `-- --configured` to skip it) |
 | Pure simulator | open http://localhost:8080/?sim |
 | JS engine tests | `npm test` |
 | C++ engine tests | `cd firmware && pio test -e native` (needs a host g++) |
@@ -96,7 +107,7 @@ The engine is implemented twice: in C++ for the board (`firmware/lib/engine`) an
 
 ## Status
 
-EspressOS is young. The C++ engine (12 tests), JS engine (14 tests), the complete editor flow (against the mock board and the simulator) and the firmware build (1.54 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
+EspressOS is young. A self-review found 18 issues across security, controller behaviour and the interface, and all have been fixed. The C++ engine (14 tests), JS engine (16 tests), the complete editor flow (against the mock board and the simulator) and the firmware build (1.55 MB of the 1.9 MB app slot) are tested. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
 
 On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 

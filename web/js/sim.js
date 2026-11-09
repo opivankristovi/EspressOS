@@ -18,7 +18,7 @@
       case 'DI': { const pin = n('pin', -1), pull = !!n('pull', 0), inv = !!n('inv', 0);
         return { begin(h) { h.setupInput(pin, pull); }, eval(c) { this.set(c, 0, (h(c).readDigital(pin) !== inv) ? 1 : 0); } }; }
       case 'DO': { const pin = n('pin', -1), inv = !!n('inv', 0);
-        return { last: -1, begin(h) { h.setupOutput(pin); this.last = -1; },
+        return { last: -1, begin(hh) { hh.setupOutput(pin, inv ? 1 : 0); this.last = inv ? 1 : 0; },
           eval(c) { const on = this.inb(c, 0), v = (on !== inv) ? 1 : 0; if (v !== this.last) { h(c).writeDigital(pin, v); this.last = v; } this.extra = on ? 1 : 0; } }; }
       case 'AI': { const pin = n('pin', -1), lo = n('min', 0), hi = n('max', 100);
         return { eval(c) { const raw = h(c).readAnalog(pin); this.set(c, 0, lo + raw / 4095 * (hi - lo)); this.extra = raw; } }; }
@@ -111,7 +111,7 @@
   };
 
   class NullHal {
-    setupInput() {} setupOutput() {} readDigital() { return false; } writeDigital() {}
+    setupInput() {} setupOutput(pin, level) {} readDigital() { return false; } writeDigital() {}
     readAnalog() { return 0; } setupPwm() {} writePwm() {}
     readSensor() { return { ok: false, v: 0 }; } timeOfDay() { return null; }
     readVirtual() { return 0; } safeOutputs() {}
@@ -119,7 +119,7 @@
 
   class Engine {
     constructor(hal) { this.hal = hal || new NullHal(); this.clear(); }
-    clear() { this.blocks = []; this.order = []; this.sig = new Float32Array(0); this.running = false; this.cycleMs = 10; this.cycles = 0; }
+    clear() { this.src = null; this.blocks = []; this.order = []; this.sig = new Float32Array(0); this.running = false; this.cycleMs = 10; this.cycles = 0; }
 
     // Returns null on success or an error string. Old program kept on error.
     load(prog) {
@@ -162,9 +162,11 @@
       this.blocks = blocks; this.order = order; this.sig = new Float32Array(nSig);
       this.cycleMs = Math.min(1000, Math.max(1, prog.cycleMs || 10)); this.cycles = 0;
       for (const b of order) if (b.begin) b.begin(this.hal);
+      this.src = JSON.stringify(prog);
       return null;
     }
-    run() { this.running = true; }
+    // Starting from stop rebuilds all blocks: outputs set up again, timers/counters/latches fresh.
+    run() { if (this.running) return; if (this.src) this.load(this.src); this.running = true; }
     stop() { this.running = false; this.hal.safeOutputs(); }
     scan(now) {
       if (!this.running || !this.order.length) return;

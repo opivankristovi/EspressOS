@@ -27,6 +27,9 @@
   let snap = null;        // latest monitor snapshot
   let liveKey = '';       // structure key of live panel
   let builtDrivers = null;
+  let connReason = '';    // 'board' | 'forced' | 'unreachable'
+  const isPhone = () => window.matchMedia('(max-width: 900px)').matches;
+  const openSide = (on) => $('.side').classList.toggle('open', on);
 
   // ------------------------------------------------------------ helpers
   let toastTimer;
@@ -146,7 +149,7 @@
     pane.append(h('div', { class: 'row' },
       h('button', { class: 'btn', onclick: () => editor.duplicateSelection() }, 'Duplicate'),
       h('button', { class: 'btn danger', onclick: () => editor.deleteSelection() }, 'Delete')));
-    if (window.matchMedia('(max-width: 900px)').matches) $('.side').classList.add('open');
+    if (isPhone()) openSide(true);
   }
 
   function pinClash(b) {
@@ -213,7 +216,7 @@
             const out = h('span', { class: 'v', 'data-vin-out': idx });
             pane.append(h('div', { class: 'kv' }, h('span', {}, name), out));
             pane.append(h('input', { type: 'range', class: 'slider', min: b.p.min, max: b.p.max, step: b.p.step || 'any', 'data-vin': idx,
-              oninput: (e) => { out.textContent = e.target.value; be.setVin(idx, Number(e.target.value)); } }));
+              oninput: (e) => { out.textContent = e.target.value; sendVin(idx, Number(e.target.value)); } }));
           } else if (b.p.mode === 'button') {
             const btn = h('button', { class: 'pushbtn', 'data-vin': idx }, 'Press');
             const set = (v) => (e) => { e.preventDefault(); btn.classList.toggle('on', !!v); be.setVin(idx, v); };
@@ -268,7 +271,7 @@
     if (snap.sim) $$('[data-din]', pane).forEach((e) => e.classList.toggle('on', !!snap.sim.din[e.dataset.din]));
     $$('[data-ain-out]', pane).forEach((e) => { const b = snap.b[e.dataset.ainOut]; e.textContent = b ? window.fmtVal(b[0]) : '–'; });
     $$('[data-out]', pane).forEach((e) => {
-      const b = snap.b ? snap.b[e.dataset.out] : null, x = b ? b[b.length - 1] : 0;
+      const b = snap.run && snap.b ? snap.b[e.dataset.out] : null, x = b ? b[b.length - 1] : 0;
       if (e.classList.contains('lamp')) e.classList.toggle('on', x >= 0.5);
       else e.textContent = window.fmtVal(x) + ' %';
     });
@@ -300,6 +303,8 @@
   function updateDirty() {
     const dirty = progJson(editor.prog) !== deployedJson;
     $('#dirty').hidden = !dirty;
+    // The board runs the deployed program; showing its values on edited blocks would mislead.
+    editor.setLivePaused(dirty);
     $('#btnDeploy').classList.toggle('pulse', dirty);
   }
 
@@ -314,7 +319,7 @@
       if (r && r.ok) {
         deployedJson = progJson(editor.prog);
         updateDirty();
-        toast(be.kind === 'sim' ? 'Running in simulator' : 'Deployed and running');
+        toast(be.kind === 'sim' ? (connReason === 'unreachable' ? 'Running in the simulator only: the board is not connected' : 'Running in simulator') : 'Deployed and running');
       } else toast('Rejected: ' + (r && r.err), true);
     } catch (e) { toast('Deploy failed: ' + e.message, true); }
     $('#btnDeploy').disabled = false;
@@ -447,9 +452,15 @@
       e.preventDefault();
       const c = { ssid: f.ssid.value, host: f.host.value || 'espressos', tz: f.tz.value, sda: Number(f.sda.value), scl: Number(f.scl.value) };
       if (f.pass.value) c.pass = f.pass.value;
-      if (f.adminPass.value) c.adminPass = f.adminPass.value;
+      if (f.adminPass.value) {
+        if (f.adminPass.value.length < 8) return toast('Admin password needs at least 8 characters', true);
+        c.adminPass = f.adminPass.value;
+      }
       const r = await be.setConfig(c).catch((x) => ({ ok: false, err: x.message }));
-      if (r.ok) { toast('Saved. Reboot the board to apply.'); f.pass.value = ''; f.adminPass.value = ''; } else toast(r.err, true);
+      if (!r.ok) return toast(r.err, true);
+      f.pass.value = '';
+      if (c.adminPass) { f.adminPass.value = ''; toast('Password changed. Log in again as user "admin".'); setTimeout(() => location.reload(), 1500); }
+      else toast('Saved. Network and I²C changes apply after a reboot.');
     });
     $('#btnReboot').addEventListener('click', async () => {
       if (!confirm('Reboot the board? Outputs switch off briefly.')) return;
@@ -503,6 +514,7 @@
       onChange,
       onWireRejected: (t) => toast(t === 'a' ? 'Analog values cannot drive a digital input directly. Use a Compare or Threshold block in between.' : 'Incompatible ports', true),
       isSimInput: (b) => b.type === 'DI' && be && be.kind === 'sim',
+      onBackground: () => { if (isPhone()) openSide(false); },
     });
     initDevices();
     initSettings();
@@ -513,16 +525,24 @@
     $('#btnZoomOut').onclick = () => editor.zoom(1 / 1.2);
     $('#chkOnline').onchange = (e) => editor.setLive(snap, e.target.checked);
     $('#btnDeploy').onclick = deploy;
-    $('#btnRun').onclick = async () => { await be.run(); refreshInfo(); };
-    $('#btnStop').onclick = async () => { await be.stop(); refreshInfo(); };
+    const runStop = async (run) => {
+      try {
+        const r = await (run ? be.run() : be.stop());
+        if (!r || !r.ok) throw new Error((r && r.err) || 'no answer');
+        if (run && progJson(editor.prog) !== deployedJson) toast('Running the deployed program. Your edits are not deployed yet.');
+        else toast(run ? 'Program running' : 'Program stopped, outputs off');
+      } catch (e) { toast((run ? 'Run' : 'Stop') + ' failed: ' + e.message, true); }
+      refreshInfo();
+    };
+    $('#btnRun').onclick = () => runStop(true);
+    $('#btnStop').onclick = () => runStop(false);
+    $('#btnPanel').onclick = () => openSide(!$('.side').classList.contains('open'));
+    $('#btnSideClose').onclick = () => openSide(false);
     document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); deploy(); } });
 
-    be = await Api.connect();
-    if (be.kind === 'sim') {
-      const bn = $('#banner');
-      bn.hidden = false;
-      bn.innerHTML = '<b>Simulation mode.</b> No EspressOS board answered, so programs run here in your browser. Click Digital-input blocks to toggle them.';
-    }
+    $('#conn').textContent = 'Looking for the board…';
+    ({ be, reason: connReason } = await Api.connect());
+    showConnBanner();
     try { builtDrivers = await be.drivers(); } catch { builtDrivers = null; }
 
     let prog;
@@ -541,13 +561,96 @@
 
     be.subscribe((s) => {
       snap = s;
+      // null (connection lost) or a stopped program clears the overlay: outputs are off then,
+      // and the last scan's values would be stale.
+      editor.setLive(s && s.run ? s : null);
       if (!s) return;
-      editor.setLive(s);
       renderLive();
       updateDeviceValues();
     });
     refreshInfo();
     setInterval(refreshInfo, 4000);
+    try { const info = await be.info(); if (info.setup) showSetupDialog(info); } catch { /* offline */ }
+  }
+
+  // ------------------------------------------------------------ connection banner
+  function showConnBanner() {
+    const bn = $('#banner');
+    bn.hidden = be.kind !== 'sim';
+    bn.className = 'banner';
+    bn.textContent = '';
+    if (be.kind !== 'sim') return;
+    if (connReason === 'forced') {
+      bn.append(h('b', {}, 'Simulation mode. '), 'Programs run here in your browser. Click Digital-input blocks to toggle them.');
+      return;
+    }
+    // The page was served by something, but the board API did not answer: say so loudly.
+    bn.classList.add('err');
+    bn.append(h('b', {}, 'The board is not answering. '), 'You are working in the simulator; Deploy will NOT reach the board. ',
+      h('button', { class: 'btn sm', onclick: () => location.reload() }, 'Retry now'));
+    const timer = setInterval(async () => {
+      if (await Api.probe(3000)) {
+        clearInterval(timer);
+        bn.textContent = '';
+        bn.className = 'banner';
+        bn.append(h('b', {}, 'The board is back. '), 'Export your work first if you changed anything (Settings), then ',
+          h('button', { class: 'btn sm', onclick: () => location.reload() }, 'Reconnect'));
+      }
+    }, 5000);
+  }
+
+  // ------------------------------------------------------------ first-run setup
+  function showSetupDialog(info) {
+    const pw = h('input', { type: 'password', autocomplete: 'new-password', minlength: 8, required: true });
+    const pw2 = h('input', { type: 'password', autocomplete: 'new-password', required: true });
+    const ssid = h('input', { autocomplete: 'off' });
+    const wpass = h('input', { type: 'password', autocomplete: 'new-password' });
+    const err = h('p', { class: 'small', style: 'color:var(--danger)' });
+    const form = h('form', { class: 'modal' },
+      h('h2', {}, 'Secure your board'),
+      h('p', { class: 'muted' }, 'This board switches real outputs. Choose an admin password first: until then it accepts no programs. You log in with user name "admin".'),
+      h('label', {}, 'Admin password (8+ characters)', pw),
+      h('label', {}, 'Repeat password', pw2),
+      info.ap ? h('div', {}, h('h3', {}, 'Wi-Fi (you can also do this later)'),
+        h('label', {}, 'Network name (SSID)', ssid), h('label', {}, 'Wi-Fi password', wpass)) : null,
+      err,
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'submit' }, 'Save')));
+    const back = h('div', { class: 'modal-back' }, form);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (pw.value.length < 8) { err.textContent = 'Use at least 8 characters.'; return; }
+      if (pw.value !== pw2.value) { err.textContent = 'The passwords do not match.'; return; }
+      const c = { adminPass: pw.value };
+      if (ssid.value) { c.ssid = ssid.value; c.pass = wpass.value; }
+      const r = await be.setConfig(c).catch((x) => ({ ok: false, err: x.message }));
+      if (!r.ok) { err.textContent = r.err; return; }
+      if (c.ssid) {
+        await be.reboot().catch(() => {});
+        form.textContent = '';
+        form.append(h('h2', {}, 'Joining ' + c.ssid + '…'),
+          h('p', {}, 'The board is restarting. Reconnect this device to your normal Wi-Fi, open http://' + (info.host || 'espressos') + '.local and log in as "admin".'));
+      } else location.reload();
+    });
+    document.body.append(back);
+    pw.focus();
+  }
+
+  // Live-panel sliders: at most one request per 150 ms per slot, always ending on the final value.
+  const vinTimers = {}, vinPending = {};
+  function sendVin(idx, v) {
+    vinPending[idx] = v;
+    if (vinTimers[idx]) return;
+    const flush = async () => {
+      if (!(idx in vinPending)) { vinTimers[idx] = null; return; }
+      const val = vinPending[idx];
+      delete vinPending[idx];
+      try {
+        const r = await be.setVin(idx, val);
+        if (r && r.ok === false) toast(r.err, true);
+      } catch (e) { toast('The board did not take the value: ' + e.message, true); }
+      vinTimers[idx] = setTimeout(flush, 150);
+    };
+    vinTimers[idx] = setTimeout(flush, 0);
   }
 
   boot();

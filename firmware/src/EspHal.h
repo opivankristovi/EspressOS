@@ -10,7 +10,7 @@ class EspHal : public eos::Hal {
   volatile float vin[kVirtual] = {};
 
   void setupInput(int pin, bool pullup) override;
-  void setupOutput(int pin) override;
+  void setupOutput(int pin, bool level) override;
   bool readDigital(int pin) override;
   void writeDigital(int pin, bool v) override;
   float readAnalog(int pin) override;

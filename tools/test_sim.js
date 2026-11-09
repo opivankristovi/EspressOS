@@ -6,7 +6,8 @@ const { Engine, NullHal } = require(path.join(__dirname, '../web/js/sim.js'));
 const Catalog = require(path.join(__dirname, '../web/js/catalog.js'));
 
 class FakeHal extends NullHal {
-  constructor() { super(); this.din = {}; this.dout = {}; this.vin = {}; this.safeCalls = 0; }
+  constructor() { super(); this.din = {}; this.dout = {}; this.vin = {}; this.safeCalls = 0; this.setupLevel = {}; }
+  setupOutput(p, level) { this.setupLevel[p] = !!level; this.dout[p] = !!level; }
   readDigital(p) { return !!this.din[p]; }
   writeDigital(p, v) { this.dout[p] = !!v; }
   readVirtual(i) { return this.vin[i] || 0; }
@@ -113,6 +114,23 @@ test('inverted output: pin level vs logical state', () => {
   assert.deepEqual(eng.snapshot().b[2], [1]);
   hal.vin[0] = 0; eng.scan(1);
   assert.equal(hal.dout[5], true);
+});
+
+test('stop then run re-arms outputs and restarts timers', () => {
+  const { hal, eng } = setup({ blocks: [{ id: 1, type: 'CONST', p: { value: 1 } }, { id: 2, type: 'DO', p: { pin: 4 } },
+    { id: 3, type: 'TON', p: { t: 2 } }], wires: [[1, 0, 2, 0], [1, 0, 3, 0]] });
+  eng.scan(0); eng.scan(1500);
+  assert.equal(hal.dout[4], true);
+  eng.stop(); assert.equal(hal.dout[4], undefined);
+  eng.run(); eng.scan(10000);
+  assert.equal(hal.dout[4], true);
+  assert.equal(eng.output(3, 0), 0);
+  eng.scan(12000); assert.equal(eng.output(3, 0), 1);
+});
+
+test('inverted output starts at its off level', () => {
+  const { hal } = setup({ blocks: [{ id: 1, type: 'DO', p: { pin: 5, inv: 1 } }], wires: [] });
+  assert.equal(hal.setupLevel[5], true);
 });
 
 test('weekly timer incl. overnight window', () => {

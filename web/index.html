@@ -49,13 +49,15 @@
         <button class="btn sm" id="btnZoomIn" title="Zoom in">+</button>
         <button class="btn sm" id="btnZoomOut" title="Zoom out">−</button>
         <label class="chk" title="Show live values on the diagram"><input type="checkbox" id="chkOnline" checked> Live view</label>
+        <button class="btn sm phone-only" id="btnPanel" title="Show or hide the Block / Live panel">☰ Panel</button>
       </div>
-      <div id="dirty" class="dirty" hidden>Changes not deployed yet</div>
+      <div id="dirty" class="dirty" hidden>Changes not deployed yet · live view paused</div>
     </div>
     <aside class="side">
       <div class="sidetabs">
         <button class="sidetab active" data-side="props">Block</button>
         <button class="sidetab" data-side="live">Live</button>
+        <button class="sidetab sideclose phone-only" id="btnSideClose" aria-label="Close panel">✕</button>
       </div>
       <div id="side-props" class="sidepane active"></div>
       <div id="side-live" class="sidepane"></div>
@@ -107,7 +109,7 @@
           <h3>Board</h3>
           <dl id="info" class="info"></dl>
           <h3>Firmware update</h3>
-          <p class="muted small">Upload a <code>firmware.bin</code> (or <code>littlefs.bin</code> for the web UI) built by PlatformIO. Outputs switch off during the update.</p>
+          <p class="muted small">Upload a <code>firmware.bin</code> (or <code>littlefs.bin</code> for the web UI) built by PlatformIO. Outputs switch off during the update. Your program and settings are kept.</p>
           <div class="row"><input type="file" id="fileOta" accept=".bin"><button class="btn" id="btnOta">Upload</button></div>
           <progress id="otaProg" max="100" value="0" hidden></progress>
         </div>

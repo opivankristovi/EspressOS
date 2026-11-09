@@ -66,7 +66,9 @@ class Engine {
   bool load(const char* json, std::string& err);
   void clear();
 
-  void run() { running_ = true; }
+  // Starting from stop rebuilds every block from the program source, so
+  // outputs are set up again and timers/counters/latches start fresh.
+  void run();
   void stop();
   bool running() const { return running_; }
 
@@ -90,6 +92,7 @@ class Engine {
   bool running_ = false;
   uint32_t cycleMs_ = 10;
   uint32_t cycles_ = 0;
+  std::string src_;  // last successfully loaded program
 };
 
 }  // namespace eos
