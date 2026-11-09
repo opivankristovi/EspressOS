@@ -75,6 +75,11 @@ test('export: standard IEC blocks, located I/O and EOS library', () => {
   assert.ok(r.xml.includes('<pou name="EOS_BLINK" pouType="functionBlock">'));
   assert.ok(/<variable formalParameter="OUT" negated="true">/.test(r.xml), 'NAND/NOR negated output');
   assert.ok(r.xml.includes('FB_B30_0'), 'feedback loop routed through a variable');
+  // OpenPLC/Beremiz ignore `negated` on in/out variables, so inverted I/O must use NOT blocks
+  assert.ok(!/<(in|out)Variable [^>]*negated/.test(r.xml), 'no negated in/out variables');
+  assert.ok(r.xml.includes('&quot;invert&quot;:&quot;in&quot;') && r.xml.includes('&quot;invert&quot;:&quot;out&quot;'), 'inverted DI and DO become tagged NOT blocks');
+  // every wire carries its route, which OpenPLC/Beremiz use to find the source pin
+  assert.ok(!/<connection [^>]*\/>/.test(r.xml), 'connections have <position> points');
   assert.ok(r.xml.includes('interval="T#20ms"'));
   assert.deepEqual(r.ioMap.map((m) => m.address + '=' + m.pin).sort(),
     ['%IW0=34', '%IX0.0=4', '%IX0.1=5', '%QW0=25', '%QX0.0=16', '%QX0.1=17', '%QX0.2=18', '%QX0.3=19'].sort());

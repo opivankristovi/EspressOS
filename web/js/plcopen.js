@@ -311,15 +311,25 @@ END_IF;`,
           const a = addr('IX');
           const v = declare('DI_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'digital input' });
-          setOut(b, 0, inVar(v, x, y, { eos, negated: !!Number(p.inv) }), null, 'BOOL');
+          const iv = inVar(v, x, y, { eos });
+          if (Number(p.inv)) {
+            // Inversion as a NOT block: OpenPLC/Beremiz ignore `negated` on in/out variables.
+            const n = block('NOT', x + 160, y, ['IN'], ['OUT'], { eos: { invert: 'in' } });
+            n.ins[0].src = { el: iv, param: undefined };
+            setOut(b, 0, n, 'OUT', 'BOOL');
+          } else setOut(b, 0, iv, null, 'BOOL');
           break;
         }
         case 'DO': {
           const a = addr('QX');
           const v = declare('DO_B' + b.id + label(b), 'BOOL', { address: a, doc: 'GPIO ' + p.pin });
           ioMap.push({ address: a, pin: Number(p.pin), block: b.id, kind: 'digital output' });
-          const e = outVar(v, x, y, { eos, negated: !!Number(p.inv) });
-          need(e, 'src', b, 0, 'BOOL', 'FALSE');
+          const e = outVar(v, x, y, { eos });
+          if (Number(p.inv)) {
+            const n = block('NOT', x - 100, y, ['IN'], ['OUT'], { eos: { invert: 'out' } });
+            e.src = { el: n, param: 'OUT' };
+            need(n, 0, b, 0, 'BOOL', 'FALSE');
+          } else need(e, 'src', b, 0, 'BOOL', 'FALSE');
           break;
         }
         case 'AI': {
@@ -655,6 +665,25 @@ END_IF;`,
       } else {
         warnings.push(`FBD element <${e.name}> is not supported and was skipped.`);
       }
+    }
+    // Fold the NOT blocks our export adds for inverted digital I/O back into the
+    // in/out variable (same meaning as `negated` on it, which other tools may write).
+    for (const n of [...el.values()]) {
+      if (n.tag !== 'block' || !n.eos || !n.eos.invert || !n.ins[0]) continue;
+      const src = n.ins[0].conn;
+      const users = [];
+      for (const e of el.values()) {
+        if (e.in && e.in.ref === n.id) users.push([e, 'in']);
+        if (e.ins) e.ins.forEach((i, k) => { if (i.conn && i.conn.ref === n.id) users.push([e, k]); });
+      }
+      if (n.eos.invert === 'out' && users.length === 1 && users[0][0].tag === 'outVariable') {
+        users[0][0].neg = !users[0][0].neg;
+        users[0][0].in = src;
+      } else if (n.eos.invert === 'in' && src && el.has(src.ref) && el.get(src.ref).tag === 'inVariable') {
+        el.get(src.ref).neg = !el.get(src.ref).neg;
+        for (const [e, slot] of users) if (slot === 'in') e.in = { ...src }; else e.ins[slot].conn = { ...src };
+      } else continue;
+      el.delete(n.id);
     }
     const connectors = new Map([...el.values()].filter((e) => e.tag === 'connector').map((e) => [e.name.toUpperCase(), e]));
 
