@@ -17,6 +17,9 @@ def main():
     editor, src, dst = (os.path.abspath(a) for a in sys.argv[1:])
     sys.path.insert(0, editor)
     import fake_wx  # noqa: F401  (stubs out wxPython so the editor modules import headless)
+    # Same import order as the editor's own CLI (Beremiz_cli -> CLIController):
+    # loading ProjectController first avoids a circular import in the GUI modules.
+    import ProjectController  # noqa: F401
     from PLCControler import PLCControler
 
     ctl = PLCControler()
