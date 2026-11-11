@@ -25,7 +25,18 @@ jobs:
         with: { node-version: 22 }
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends flex bison autoconf automake libtool python3-lxml python3-numpy python3-matplotlib python3-jinja2
+        timeout-minutes: 15
+        run: |
+          install() {
+            sudo apt-get update -o Acquire::Retries=2 &&
+            sudo apt-get install -y --no-install-recommends flex bison autoconf automake libtool python3-lxml python3-numpy python3-matplotlib python3-jinja2
+          }
+          if ! install; then
+            # The runners' Azure Ubuntu mirror is sometimes unreachable: use the main archive instead.
+            echo "::warning::Ubuntu mirror unreachable, retrying with archive.ubuntu.com"
+            echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt
+            install
+          fi
 
       - name: Fetch matiec and OpenPLC Editor
         run: |
