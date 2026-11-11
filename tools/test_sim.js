@@ -144,6 +144,40 @@ test('weekly timer incl. overnight window', () => {
   assert.equal(q(2, 7 * 60), 0); assert.equal(q(2, 23 * 60), 0); // Tuesday not selected
 });
 
+test('MQTT in/out: value, Q, formatting and rate limit', () => {
+  class MqHal extends NullHal { constructor() { super(); this.mqttIn = {}; this.sent = []; } mqttPublish(t, p) { this.sent.push([t, p]); } }
+  const hal = new MqHal(), e = new Engine(hal);
+  assert.equal(e.load({ blocks: [{ id: 1, type: 'MQTTIN', p: { topic: 't/in', def: 0.75 } },
+    { id: 2, type: 'MQTTOUT', p: { topic: 't/num', fmt: 'num', dec: 2, every: 1 } }, { id: 3, type: 'MQTTOUT', p: { topic: 't/sw', fmt: 'onoff', every: 0 } }],
+  wires: [[1, 0, 2, 0], [1, 1, 3, 0]] }), null);
+  e.run();
+  e.scan(0);
+  assert.equal(e.output(1, 0), 0.75); assert.equal(e.output(1, 1), 1);
+  assert.deepEqual(hal.sent, [['t/num', '0.75'], ['t/sw', 'ON']]);
+  hal.mqttIn['t/in'] = 21.5; e.scan(100);
+  assert.equal(hal.sent.length, 2);
+  e.scan(1000); assert.deepEqual(hal.sent[2], ['t/num', '21.5']);
+  hal.mqttIn['t/in'] = 0; e.scan(1100); assert.deepEqual(hal.sent[3], ['t/sw', 'OFF']);
+  e.scan(2000); assert.deepEqual(hal.sent[4], ['t/num', '0']);
+  e.scan(3000); assert.equal(hal.sent.length, 5);
+  assert.match(e.load({ blocks: [{ id: 1, type: 'MQTTIN', p: { topic: '' } }], wires: [] }), /no MQTT topic/);
+  assert.match(e.load({ blocks: [{ id: 1, type: 'MQTTOUT', p: { topic: 'a/+/b' } }], wires: [] }), /wildcards/);
+});
+
+test('MQTT payload text matches the firmware', () => {
+  const { mqttPayload, parsePayload } = require(path.join(__dirname, '../web/js/sim.js'));
+  assert.equal(mqttPayload(Math.fround(21.456), 'num', 2), '21.46');
+  assert.equal(mqttPayload(3, 'num', 2), '3');
+  assert.equal(mqttPayload(-0.001, 'num', 2), '0');
+  assert.equal(mqttPayload(0.5, 'bool', 2), 'true');
+  assert.equal(mqttPayload(0.4, '01', 2), '0');
+  for (const [t, v] of [['ON', 1], [' off ', 0], ['true', 1], ['PRESS', 1], ['23.5', 23.5], ['-1e2', -100], ['.5', 0.5]]) assert.equal(parsePayload(t), v, t);
+  for (const t of ['', 'abc', '1.2.3', '0x10', 'inf', '1e']) assert.equal(parsePayload(t), null, t);
+  // the firmware's parser accepts exactly the same forms
+  const src = require('fs').readFileSync(path.join(__dirname, '../firmware/src/Mqtt.cpp'), 'utf8');
+  assert.ok(src.includes('{"on", "true", "open", "yes", "press"}') && src.includes('{"off", "false", "closed", "no"}'));
+});
+
 test('catalogue port counts match the engine', () => {
   const { N_IN, N_OUT } = require(path.join(__dirname, '../web/js/sim.js'));
   for (const b of Catalog.BLOCKS) {

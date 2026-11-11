@@ -35,7 +35,8 @@ const located = (address) => '__' + address.slice(1).replace('.', '_');  // %IX0
 function prepare(progFile, dir) {
   const prog = JSON.parse(fs.readFileSync(progFile, 'utf8'));
   const { vars } = P.exportPLCopen(prog, { name: 'check' });
-  const ins = vars.filter((v) => v.role && v.role.kind !== 'do' && v.role.kind !== 'ao');
+  const IN_KINDS = ['di', 'ai', 'vin', 'sensor', 'clock', 'mqtt'];
+  const ins = vars.filter((v) => v.role && IN_KINDS.includes(v.role.kind));
   const outs = vars.filter((v) => v.role && (v.role.kind === 'do' || v.role.kind === 'ao'));
   const cycleMs = Math.min(1000, Math.max(1, prog.cycleMs || 10));
 
@@ -49,6 +50,7 @@ function prepare(progFile, dir) {
       case 'vin': return 0;
       case 'sensor': return 22.5;      // multiples of 0.5 are exact in float and double
       case 'clock': return { dow: 2, minute: 600, valid: 0 }[v.role.part];
+      case 'mqtt': return v.role.part === 'v' ? v.role.def : (Math.fround(v.role.def) >= 0.5 ? 1 : 0);
       default: return 0;
     }
   }
@@ -63,6 +65,8 @@ function prepare(progFile, dir) {
         if (v.role.part === 'valid') return k < 100 ? 0 : 1;  // clock not set at first
         if (v.role.part === 'dow') return r < 0.02 ? Math.floor(rand() * 7) : cur;
         return r < 0.1 ? Math.floor(rand() * 1440) : cur;
+      case 'mqtt':  // a new message now and then; Q follows the value (set in the loop below)
+        return v.role.part === 'v' && r < 0.05 ? (Math.floor(rand() * 41) - 10) * 0.25 : cur;
       default: return cur;
     }
   }
@@ -76,6 +80,7 @@ function prepare(progFile, dir) {
     readVirtual(i) { return cur['vin' + i] || 0; }
     readSensor(d, c) { return { ok: true, v: cur['s' + d + '.' + c] || 0 }; }
     timeOfDay() { return cur.valid ? { dow: cur.dow, m: cur.minute } : null; }
+    mqttValue(topic) { return { ok: true, v: cur['mq' + topic] }; }
     setupOutput(pin, level) { this.dout[pin] = level ? 1 : 0; }
     writeDigital(pin, v) { this.dout[pin] = v ? 1 : 0; }
   }
@@ -95,6 +100,8 @@ function prepare(progFile, dir) {
       else if (r.kind === 'vin') cur['vin' + r.idx] = x;
       else if (r.kind === 'sensor') cur['s' + r.dev + '.' + r.ch] = x;
       else if (r.kind === 'clock') cur[r.part] = x;
+      else if (r.kind === 'mqtt' && r.part === 'v') cur['mq' + r.topic] = x;
+      else if (r.kind === 'mqtt') state[i] = Math.fround(cur['mq' + r.topic]) >= 0.5 ? 1 : 0;  // the _Q variable
     });
     eng.scan(k * cycleMs);
     // what the C side gets: OpenPLC delivers analog inputs as ADC x 16

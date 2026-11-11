@@ -1,5 +1,6 @@
 // Built-in function blocks. Keep names/ports in sync with web/js/blocks.js.
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "Engine.h"
@@ -73,6 +74,62 @@ struct Sensor : Block {
     float v = c.hal->readSensor(dev, ch, &ok);
     if (ok) set(c, 0, v);  // hold last good value
     set(c, 1, ok ? 1 : 0);
+  }
+};
+
+// ---------------------------------------------------------------- MQTT
+// Value received on a topic (payload "ON"/"OFF"/"true"/a number...).
+// Outputs the number and Q = number >= 0.5; `def` until the first message.
+struct MqttIn : Block {
+  std::string topic; float def; int h = -1;
+  explicit MqttIn(const Params& p) : topic(p.str("topic", "")), def(p.num("def", 0)) {}
+  void begin(Hal& hal) override { h = hal.mqttSubscribe(topic.c_str()); }
+  void eval(Ctx& c) override {
+    float v = 0;
+    bool ok = h >= 0 && c.hal->mqttValue(h, &v);
+    if (!ok) v = def;
+    set(c, 0, v);
+    set(c, 1, v >= 0.5f ? 1 : 0);
+    extra = ok ? 1 : 0;
+  }
+};
+
+// Formats a value the way MqttOut publishes it. fmt: "num", "onoff", "bool", "01".
+void mqttPayload(char* buf, size_t n, float x, const std::string& fmt, int dec) {
+  bool on = x >= 0.5f;
+  if (fmt == "onoff") { snprintf(buf, n, "%s", on ? "ON" : "OFF"); return; }
+  if (fmt == "bool") { snprintf(buf, n, "%s", on ? "true" : "false"); return; }
+  if (fmt == "01") { snprintf(buf, n, "%s", on ? "1" : "0"); return; }
+  if (dec < 0) dec = 0;
+  if (dec > 6) dec = 6;
+  snprintf(buf, n, "%.*f", dec, (double)x);
+  if (strchr(buf, '.')) {  // 21.50 -> 21.5, 3.00 -> 3
+    char* e = buf + strlen(buf) - 1;
+    while (*e == '0') *e-- = 0;
+    if (*e == '.') *e = 0;
+  }
+  if (!strcmp(buf, "-0")) snprintf(buf, n, "0");
+}
+
+// Publishes its input when the formatted value changes, at most once per `every` seconds
+// (the latest value is always sent once the interval has passed).
+struct MqttOut : Block {
+  std::string topic, fmt; int dec; uint32_t every; bool retain;
+  int h = -1; bool sent = false; uint32_t lastT = 0; char last[24] = "";
+  explicit MqttOut(const Params& p)
+      : topic(p.str("topic", "")), fmt(p.str("fmt", "num")), dec((int)p.num("dec", 2)),
+        every(secToMs(p.num("every", 1))), retain(p.num("retain", 1) != 0) {}
+  void begin(Hal& hal) override { h = hal.mqttAdvertise(topic.c_str(), retain); sent = false; last[0] = 0; }
+  void eval(Ctx& c) override {
+    float x = inp(c, 0);
+    extra = x;
+    char buf[24];
+    mqttPayload(buf, sizeof buf, x, fmt, dec);
+    if (h < 0 || !strcmp(buf, last) || (sent && c.now - lastT < every)) return;
+    c.hal->mqttPublish(h, buf);
+    snprintf(last, sizeof last, "%s", buf);
+    lastT = c.now;
+    sent = true;
   }
 };
 
@@ -317,7 +374,8 @@ const std::vector<BlockType> kTypes = {
     {"TON", 1, 1, make<TON>},        {"TOF", 1, 1, make<TOF>},        {"TP", 1, 1, make<TP>},
     {"BLINK", 1, 1, make<Blink>},    {"WEEK", 0, 1, make<Week>},      {"CTR", 3, 2, make<Counter>},
     {"CMP", 2, 1, make<Cmp>},        {"THRESH", 1, 1, make<Thresh>},  {"MATH", 2, 1, make<Math>},
-    {"SCALE", 1, 1, make<Scale>},    {"SEL", 3, 1, make<Sel>},
+    {"SCALE", 1, 1, make<Scale>},    {"SEL", 3, 1, make<Sel>},        {"MQTTIN", 0, 2, make<MqttIn>},
+    {"MQTTOUT", 1, 0, make<MqttOut>},
 };
 
 }  // namespace

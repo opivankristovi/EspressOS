@@ -43,6 +43,9 @@
         <g id="world"><g id="wires"></g><g id="blocks"></g><path id="dragwire" class="wire drag" d=""/></g>
       </svg>
       <div class="canvas-tools">
+        <button class="btn sm" id="btnNewSheet" title="Start an empty program. The board keeps running its program until you deploy; Ctrl+Z brings your drawing back.">New</button>
+        <button class="btn sm" id="btnRestore" title="Throw away all changes and go back to the program that is on the board" disabled>Restore</button>
+        <span class="tsep"></span>
         <button class="btn sm" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
         <button class="btn sm" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
         <button class="btn sm" id="btnFit" title="Fit to screen">⤢</button>
@@ -99,6 +102,18 @@
           <p class="small" id="apKeyInfo" hidden>If the board cannot reach your Wi-Fi for 2 minutes, it opens its own <b>EspressOS-…</b> network so you can still get in. Its password: <code id="apKey"></code></p>
           <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="btnReboot">Reboot board</button></div>
         </form>
+        <form class="card" id="formMqtt">
+          <h3>MQTT &amp; Home Assistant</h3>
+          <p class="muted small">Connects the board to an MQTT broker (for example the Mosquitto add-on of Home Assistant). Used by the <b>MQTT in</b> and <b>MQTT out</b> blocks, and to show web switches and setpoints in Home Assistant.</p>
+          <div class="row"><label class="grow">Broker host or IP<input name="host" placeholder="empty = MQTT off" autocomplete="off"></label><label class="port">Port<input name="port" type="number" min="1" max="65535" placeholder="1883"></label></div>
+          <div class="row"><label class="grow">User name<input name="user" autocomplete="off"></label><label class="grow">Password<input name="pass" type="password" autocomplete="new-password"></label></div>
+          <label>Base topic for web controls<input name="base" autocomplete="off"></label>
+          <label class="inline"><input type="checkbox" name="ha"> Announce web switches and setpoints to Home Assistant (MQTT discovery)</label>
+          <label>Discovery prefix<input name="haPrefix" placeholder="homeassistant"></label>
+          <p class="small" id="mqttTopics"></p>
+          <p class="small">Status: <b id="mqttStatus">–</b></p>
+          <div class="row"><button class="btn primary" type="submit">Save</button></div>
+        </form>
         <div class="card">
           <h3>Program</h3>
           <label>Scan cycle<select id="cycleMs"><option value="5">5 ms</option><option value="10">10 ms</option><option value="20">20 ms</option><option value="50">50 ms</option><option value="100">100 ms</option></select></label>
@@ -106,8 +121,8 @@
             <button class="btn" id="btnExport">Export .json</button>
             <button class="btn" id="btnExportXml" title="IEC 61131-3 PLCopen XML for OpenPLC Editor, Beremiz and other IEC tools">Export PLCopen XML</button>
             <label class="btn">Import .json / .xml<input type="file" id="fileImport" accept=".json,.xml,application/json,text/xml" hidden></label>
-            <button class="btn danger" id="btnNew">New program</button>
           </div>
+          <label class="inline"><input type="checkbox" id="chkAskSave"> Before deploying over a program on the board, offer to save a copy of it</label>
           <h3>Board</h3>
           <dl id="info" class="info"></dl>
           <h3>Firmware update</h3>

@@ -82,7 +82,9 @@ test('export: standard IEC blocks, located I/O and EOS library', () => {
   assert.ok(!/<connection [^>]*\/>/.test(r.xml), 'connections have <position> points');
   assert.ok(r.xml.includes('interval="T#20ms"'));
   assert.deepEqual(r.ioMap.map((m) => m.address + '=' + m.pin).sort(),
-    ['%IW0=34', '%IX0.0=4', '%IX0.1=5', '%QW0=25', '%QX0.0=16', '%QX0.1=17', '%QX0.2=18', '%QX0.3=19'].sort());
+    ['%IW0=34', '%IX0.0=4', '%IX0.1=5', '%QW0=25', '%QX0.0=16', '%QX0.1=17', '%QX0.2=18', '%QX0.3=19', '%QX0.4=23'].sort());
+  assert.ok(r.vars.some((v) => v.name === 'MQ_Remote' && v.role.kind === 'mqtt') && r.vars.some((v) => v.name === 'MQ_Remote_Q'), 'MQTT in as variables');
+  assert.ok(r.vars.some((v) => v.role && v.role.kind === 'mqttout'), 'MQTT out as a variable');
   assert.ok(r.warnings.some((w) => /sensor/.test(w)));
 });
 

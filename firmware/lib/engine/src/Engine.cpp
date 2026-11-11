@@ -44,6 +44,15 @@ bool pinUseOf(const std::string& type, PinUse* use) {
   return true;
 }
 
+// Problem with an MQTT topic, or nullptr. Wildcards only make sense for
+// subscriptions that collect several topics, which a block cannot represent.
+const char* topicProblem(const std::string& t) {
+  if (t.empty()) return "has no MQTT topic";
+  if (t.size() > (size_t)kMaxTopicLen) return "MQTT topic is too long (max 96 characters)";
+  if (t.find_first_of("+#") != std::string::npos) return "MQTT topic must not contain the wildcards + or #";
+  return nullptr;
+}
+
 }  // namespace
 
 bool Engine::load(const char* json, std::string& err) {
@@ -58,6 +67,7 @@ bool Engine::load(const char* json, std::string& err) {
   std::vector<const BlockType*> types;
   std::map<int, size_t> byId;
   std::map<int, std::pair<int, bool>> pinOwner;  // pin -> (block id, drives it)
+  std::vector<std::string> mqttIn, mqttOut;       // distinct topics
   size_t nSig = 0;
 
   for (JsonObjectConst o : jb) {
@@ -79,6 +89,15 @@ bool Engine::load(const char* json, std::string& err) {
         return false;
       }
       pinOwner[pin] = {id, drives || (it != pinOwner.end() && it->second.second)};
+    }
+    if (type == "MQTTIN" || type == "MQTTOUT") {
+      std::string topic = p.str("topic", "");
+      if (const char* why = topicProblem(topic)) { err = fmt("Block %d ", id) + why; return false; }
+      auto& list = type == "MQTTIN" ? mqttIn : mqttOut;
+      bool known = false;
+      for (const auto& t : list) known |= t == topic;
+      if (!known) list.push_back(topic);
+      if (list.size() > (size_t)kMaxMqtt) { err = fmt("More than %d MQTT topics in one direction", kMaxMqtt); return false; }
     }
     Block* b = bt->create(p);
     if (!b) { err = "Cannot create " + type; return false; }
@@ -133,6 +152,7 @@ bool Engine::load(const char* json, std::string& err) {
   if (cycleMs_ < 1) cycleMs_ = 1;
   if (cycleMs_ > 1000) cycleMs_ = 1000;
   cycles_ = 0;
+  hal_.beginProgram();
   for (Block* b : order_) b->begin(hal_);
   if (src_.c_str() != json) src_ = json;
   err.clear();

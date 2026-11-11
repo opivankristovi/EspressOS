@@ -5,9 +5,41 @@
   'use strict';
 
   const N_IN = { DI: 0, DO: 1, AI: 0, AO: 1, CONST: 0, VIN: 0, SENSOR: 0, AND: 4, OR: 4, XOR: 4, NAND: 4, NOR: 4,
-    NOT: 1, SR: 2, EDGE: 1, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 0, CTR: 3, CMP: 2, THRESH: 1, MATH: 2, SCALE: 1, SEL: 3 };
+    NOT: 1, SR: 2, EDGE: 1, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 0, CTR: 3, CMP: 2, THRESH: 1, MATH: 2, SCALE: 1, SEL: 3,
+    MQTTIN: 0, MQTTOUT: 1 };
   const N_OUT = { DI: 1, DO: 0, AI: 1, AO: 0, CONST: 1, VIN: 1, SENSOR: 2, AND: 1, OR: 1, XOR: 1, NAND: 1, NOR: 1,
-    NOT: 1, SR: 1, EDGE: 2, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 1, CTR: 2, CMP: 1, THRESH: 1, MATH: 1, SCALE: 1, SEL: 1 };
+    NOT: 1, SR: 1, EDGE: 2, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 1, CTR: 2, CMP: 1, THRESH: 1, MATH: 1, SCALE: 1, SEL: 1,
+    MQTTIN: 2, MQTTOUT: 0 };
+  const MAX_MQTT = 16, MAX_TOPIC = 96;
+
+  // Same checks as topicProblem() in Engine.cpp.
+  function topicProblem(t) {
+    if (!t) return 'has no MQTT topic';
+    if (t.length > MAX_TOPIC) return 'MQTT topic is too long (max 96 characters)';
+    if (/[+#]/.test(t)) return 'MQTT topic must not contain the wildcards + or #';
+    return null;
+  }
+
+  // Same text as mqttPayload() in Blocks.cpp. fmt: num | onoff | bool | 01
+  function mqttPayload(x, fmt, dec) {
+    const on = x >= 0.5;
+    if (fmt === 'onoff') return on ? 'ON' : 'OFF';
+    if (fmt === 'bool') return on ? 'true' : 'false';
+    if (fmt === '01') return on ? '1' : '0';
+    dec = Math.min(6, Math.max(0, Math.trunc(dec) || 0));
+    let s = x.toFixed(dec);
+    if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s === '-0' ? '0' : s;
+  }
+
+  // Payload text -> number, as the firmware reads MQTT messages (null = not understood).
+  function parsePayload(text) {
+    const t = String(text).trim().toLowerCase();
+    if (['on', 'true', 'open', 'yes', 'press'].includes(t)) return 1;
+    if (['off', 'false', 'closed', 'no'].includes(t)) return 0;
+    if (t === '' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/.test(t)) return null;
+    return Math.fround(Number(t));
+  }
 
   const ms = (s) => (s <= 0 ? 0 : Math.round(s * 1000));
 
@@ -109,6 +141,18 @@
         return { eval(c) { const x = this.inp(c, 0); let r = i1 === i0 ? o0 : o0 + (x - i0) * (o1 - o0) / (i1 - i0);
           if (clamp) r = Math.min(Math.max(r, Math.min(o0, o1)), Math.max(o0, o1)); this.set(c, 0, r); } }; }
       case 'SEL': return { eval(c) { this.set(c, 0, this.inb(c, 2) ? this.inp(c, 1) : this.inp(c, 0)); } };
+      case 'MQTTIN': { const topic = s('topic', ''), def = n('def', 0);
+        return { h: -1, begin(hh) { this.h = hh.mqttSubscribe(topic); },
+          eval(c) { const r = this.h < 0 ? null : h(c).mqttValue(this.h); const ok = !!(r && r.ok);
+            const v = ok ? r.v : def; this.set(c, 0, v); this.set(c, 1, Math.fround(v) >= 0.5 ? 1 : 0); this.extra = ok ? 1 : 0; } }; }
+      case 'MQTTOUT': { const topic = s('topic', ''), fmt = s('fmt', 'num'), dec = n('dec', 2), every = ms(n('every', 1)), retain = !!n('retain', 1);
+        return { h: -1, sent: false, lastT: 0, last: '', begin(hh) { this.h = hh.mqttAdvertise(topic, retain); this.sent = false; this.last = ''; },
+          eval(c) {
+            const x = this.inp(c, 0); this.extra = x;
+            const pl = mqttPayload(x, fmt, dec);
+            if (this.h < 0 || pl === this.last || (this.sent && c.now - this.lastT < every)) return;
+            h(c).mqttPublish(this.h, pl); this.last = pl; this.lastT = c.now; this.sent = true;
+          } }; }
     }
     return null;
   }
@@ -125,6 +169,12 @@
     readAnalog() { return 0; } setupPwm() {} writePwm() {}
     readSensor() { return { ok: false, v: 0 }; } timeOfDay() { return null; }
     readVirtual() { return 0; } safeOutputs() {}
+    // MQTT: a simple in-memory broker. Handles are topic strings.
+    beginProgram() {}
+    mqttSubscribe(topic) { return topic; }
+    mqttValue(t) { return this.mqttIn && t in this.mqttIn ? { ok: true, v: this.mqttIn[t] } : { ok: false, v: 0 }; }
+    mqttAdvertise(topic) { return topic; }
+    mqttPublish(t, payload) { (this.mqttOut || (this.mqttOut = {}))[t] = payload; }
   }
 
   class Engine {
@@ -134,7 +184,7 @@
     // Returns null on success or an error string. Old program kept on error.
     load(prog) {
       if (typeof prog === 'string') { try { prog = JSON.parse(prog); } catch (e) { return 'JSON: ' + e.message; } }
-      const blocks = [], byId = new Map(), pinOwner = new Map(); let nSig = 0;
+      const blocks = [], byId = new Map(), pinOwner = new Map(), mqtt = {}; let nSig = 0;
       for (const o of prog.blocks || []) {
         if (!(o.type in N_IN)) return "Unknown block type '" + o.type + "'";
         if (!(o.id > 0) || byId.has(o.id)) return 'Invalid or duplicate block id ' + o.id;
@@ -147,6 +197,13 @@
           const prev = pinOwner.get(pin), drives = use === 'out';
           if (prev && (drives || prev.drives)) return 'GPIO ' + pin + ' is used by block ' + prev.id + ' and block ' + o.id;
           pinOwner.set(pin, { id: o.id, drives: drives || !!(prev && prev.drives) });
+        }
+        if (o.type === 'MQTTIN' || o.type === 'MQTTOUT') {
+          const topic = o.p && o.p.topic !== undefined ? String(o.p.topic) : '';
+          const why = topicProblem(topic);
+          if (why) return 'Block ' + o.id + ' ' + why;
+          (mqtt[o.type] = mqtt[o.type] || new Set()).add(topic);
+          if (mqtt[o.type].size > MAX_MQTT) return 'More than ' + MAX_MQTT + ' MQTT topics in one direction';
         }
         const b = makeEval(o.type, o.p || {});
         Object.setPrototypeOf(b, BlockProto);
@@ -181,6 +238,7 @@
       this.hal.safeOutputs();
       this.blocks = blocks; this.order = order; this.sig = new Float32Array(nSig);
       this.cycleMs = Math.min(1000, Math.max(1, prog.cycleMs || 10)); this.cycles = 0;
+      if (this.hal.beginProgram) this.hal.beginProgram();
       for (const b of order) if (b.begin) b.begin(this.hal);
       this.src = JSON.stringify(prog);
       return null;
@@ -206,7 +264,7 @@
     }
   }
 
-  const api = { Engine, NullHal, N_IN, N_OUT };
+  const api = { Engine, NullHal, N_IN, N_OUT, mqttPayload, parsePayload, topicProblem };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Sim = api;
 })(this);

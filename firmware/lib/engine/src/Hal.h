@@ -31,6 +31,17 @@ class Hal {
   virtual float readVirtual(int idx) { (void)idx; return 0; }
   // Put every output that was set up into its safe (off) state.
   virtual void safeOutputs() {}
+
+  // A program is about to be started: MQTT blocks register their topics again
+  // in begin(), so the HAL can drop the ones nothing uses any more.
+  virtual void beginProgram() {}
+  // MQTT. Handles come from mqttSubscribe / mqttAdvertise (-1 = no slot left).
+  virtual int mqttSubscribe(const char* topic) { (void)topic; return -1; }
+  // Latest value received on a subscribed topic; false until a message arrived.
+  virtual bool mqttValue(int handle, float* v) { (void)handle; (void)v; return false; }
+  virtual int mqttAdvertise(const char* topic, bool retain) { (void)topic; (void)retain; return -1; }
+  // Queues a message; the network side sends it when connected (latest value wins).
+  virtual void mqttPublish(int handle, const char* payload) { (void)handle; (void)payload; }
 };
 
 }  // namespace eos

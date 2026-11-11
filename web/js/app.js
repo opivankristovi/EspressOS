@@ -28,6 +28,7 @@
   let liveKey = '';       // structure key of live panel
   let builtDrivers = null;
   let i2cBus = { sda: 21, scl: 22 };  // replaced by the board's settings once known
+  let mqttCfg = null;     // the board's MQTT settings (null in the simulator / unknown)
   let connReason = '';    // 'board' | 'forced' | 'unreachable'
   const isPhone = () => window.matchMedia('(max-width: 900px)').matches;
   const openSide = (on) => $('.side').classList.toggle('open', on);
@@ -40,6 +41,27 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), err ? 6000 : 2500);
   }
   const progJson = (p) => JSON.stringify(p);
+  function download(blob, name) {
+    const a = h('a', { href: URL.createObjectURL(blob), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  // Modal with a choice of buttons: resolves to the key of the button pressed ('cancel' for Esc / outside click).
+  function choose(title, text, buttons, extra) {
+    return new Promise((resolve) => {
+      const back = h('div', { class: 'modal-back' });
+      const done = (k) => { back.remove(); document.removeEventListener('keydown', onKey); resolve(k); };
+      const onKey = (e) => { if (e.key === 'Escape') done('cancel'); };
+      const btns = buttons.map(([k, label, cls]) => h('button', { class: 'btn' + (cls ? ' ' + cls : ''), type: 'button', onclick: () => done(k) }, label));
+      back.append(h('div', { class: 'modal', role: 'dialog', 'aria-label': title },
+        h('h2', {}, title), h('p', { class: 'muted' }, text), extra || null, h('div', { class: 'choices' }, btns)));
+      back.addEventListener('click', (e) => { if (e.target === back) done('cancel'); });
+      document.addEventListener('keydown', onKey);
+      document.body.append(back);
+      btns[0].focus();
+    });
+  }
+  const stamp = () => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
   function devLabel(d) { return d ? (d.name || d.driver) + ' #' + d.id : '(none)'; }
   function driverOf(devId) {
     const d = editor.prog.devices.find((x) => x.id === Number(devId));
@@ -180,11 +202,25 @@
           out.push({ lvl: 'err', msg: `B${b.id}: GPIO ${k} is the I²C bus used by your sensors` });
         pins[k] = { id: b.id, out: isOut || !!(pins[k] && pins[k].out) };
       }
-      if ((b.type === 'DO' || b.type === 'AO') && !wiredIn.has(b.id + '.0')) out.push({ lvl: 'warn', msg: `B${b.id} ${d.label} has no input wire` });
+      if ((b.type === 'DO' || b.type === 'AO' || b.type === 'MQTTOUT') && !wiredIn.has(b.id + '.0')) out.push({ lvl: 'warn', msg: `B${b.id} ${d.label} has no input wire` });
       if (b.type === 'SENSOR' && !prog.devices.find((x) => x.id === Number(b.p.dev))) out.push({ lvl: 'err', msg: `B${b.id} reads a sensor that does not exist` });
       if (['AND', 'OR', 'XOR', 'NAND', 'NOR', 'NOT', 'SR', 'TON', 'TOF', 'TP', 'EDGE', 'CMP', 'THRESH', 'SCALE'].includes(b.type) && d.ins.every((_, i) => !wiredIn.has(b.id + '.' + i)))
         out.push({ lvl: 'warn', msg: `B${b.id} ${d.label} has no inputs connected` });
     }
+    const mq = prog.blocks.filter((b) => b.type === 'MQTTIN' || b.type === 'MQTTOUT');
+    const outTopics = {}, topics = { MQTTIN: new Set(), MQTTOUT: new Set() };
+    for (const b of mq) {
+      const t = b.p.topic === undefined ? '' : String(b.p.topic);
+      const why = Sim.topicProblem(t);
+      if (why) out.push({ lvl: 'err', msg: `B${b.id} ${why}` });
+      topics[b.type].add(t);
+      if (b.type === 'MQTTOUT') {
+        if (outTopics[t]) out.push({ lvl: 'warn', msg: `B${outTopics[t]} and B${b.id} both publish to ${t}` });
+        outTopics[t] = b.id;
+      }
+    }
+    for (const k of ['MQTTIN', 'MQTTOUT']) if (topics[k].size > 16) out.push({ lvl: 'err', msg: `More than 16 different ${k === 'MQTTIN' ? 'MQTT in' : 'MQTT out'} topics` });
+    if (mq.length && mqttCfg && !mqttCfg.host) out.push({ lvl: 'warn', msg: 'MQTT blocks need a broker: enter it under Settings → MQTT' });
     const vins = {};
     for (const b of prog.blocks.filter((x) => x.type === 'VIN')) {
       const i = Number(b.p.idx);
@@ -203,7 +239,7 @@
 
   // ------------------------------------------------------------ live panel
   function liveStructureKey() {
-    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'DO', 'AO'].includes(b.type)).map((b) => [b.id, b.p]), editor.prog.devices, be.kind]);
+    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'DO', 'AO', 'MQTTIN', 'MQTTOUT'].includes(b.type)).map((b) => [b.id, b.p, b.note]), editor.prog.devices, be.kind]);
   }
   function renderLive() {
     const key = liveStructureKey();
@@ -249,6 +285,23 @@
         for (const b of outs) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || 'GPIO ' + b.p.pin}`),
           b.type === 'DO' ? h('span', { class: 'lamp', 'data-out': b.id }) : h('span', { class: 'v', 'data-out': b.id })));
       }
+      const mqs = prog.blocks.filter((b) => b.type === 'MQTTIN' || b.type === 'MQTTOUT');
+      if (mqs.length) {
+        pane.append(h('h3', {}, 'MQTT'));
+        for (const b of mqs) {
+          const topic = String(b.p.topic || '');
+          const row = h('div', { class: 'kv', title: topic }, h('span', {}, (b.type === 'MQTTIN' ? '⇣ ' : '⇡ ') + (b.note || topic)), h('span', { class: 'v', 'data-mq': b.id }));
+          if (be.kind === 'sim' && b.type === 'MQTTIN') {
+            row.title = 'Click to simulate a message on ' + topic;
+            row.style.cursor = 'pointer';
+            row.addEventListener('click', () => {
+              const v = prompt(`Simulated message on ${topic} (ON, OFF or a number)`);
+              if (v !== null && !be.setMqtt(topic, v)) toast('Not understood: use ON, OFF, true, false or a number', true);
+            });
+          }
+          pane.append(row);
+        }
+      }
       if (prog.devices.length) {
         pane.append(h('h3', {}, 'Sensors'));
         for (const d of prog.devices) {
@@ -279,6 +332,12 @@
       const b = snap.run && snap.b ? snap.b[e.dataset.out] : null, x = b ? b[b.length - 1] : 0;
       if (e.classList.contains('lamp')) e.classList.toggle('on', x >= 0.5);
       else e.textContent = window.fmtVal(x) + ' %';
+    });
+    $$('[data-mq]', pane).forEach((e) => {
+      const b = snap.run && snap.b ? snap.b[e.dataset.mq] : null;
+      if (!b) { e.textContent = '–'; return; }
+      if (b.length === 3) e.textContent = b[2] ? window.fmtVal(b[0]) : 'no message yet';  // MQTT in: value, Q, received
+      else e.textContent = window.fmtVal(b[0]);                                          // MQTT out: value sent
     });
     $$('[data-dev]', pane).forEach((e) => {
       const [id, ch] = e.dataset.dev.split('.').map(Number);
@@ -311,6 +370,46 @@
     // The board runs the deployed program; showing its values on edited blocks would mislead.
     editor.setLivePaused(dirty);
     $('#btnDeploy').classList.toggle('pulse', dirty);
+    $('#btnRestore').disabled = !dirty;
+  }
+
+  // Empty sheet; the board keeps its program until the next deploy.
+  function newSheet() {
+    if (!editor.prog.blocks.length && !editor.prog.devices.length) return;
+    editor.checkpoint();
+    editor.setProgram(Object.assign(Api.EMPTY(), { cycleMs: editor.prog.cycleMs || 10 }), true);
+    editor.changed();
+    toast('Empty program. The board keeps running until you deploy. Ctrl+Z brings your drawing back.');
+  }
+
+  // Back to the program on the board, dropping every change since the last deploy (undoable).
+  async function restoreDeployed() {
+    let prog;
+    try { prog = Object.assign(Api.EMPTY(), await be.getProgram()); } catch (e) { toast('Could not read the program from the board: ' + e.message, true); return; }
+    deployedJson = progJson(prog);
+    editor.checkpoint();
+    editor.setProgram(JSON.parse(deployedJson), true);
+    editor.changed();
+    editor.fit();
+    toast('Back to the program on the board. Ctrl+Z brings your changes back.');
+  }
+
+  // Before a deploy replaces a different program on the board, offer to save a copy of it.
+  async function okToReplace() {
+    if (store.get('eos.askSave') === 'no') return true;
+    let cur, info;
+    try { cur = Object.assign(Api.EMPTY(), await be.getProgram()); info = await be.info(); } catch { return true; }
+    if (!cur.blocks.length || progJson(cur) === progJson(editor.prog)) return true;
+    const dont = h('input', { type: 'checkbox' });
+    const where = be.kind === 'sim' ? 'The simulator' : 'The board';
+    const ans = await choose('Save the current program first?',
+      `${where} ${info && info.running ? 'is running' : 'holds'} a program with ${cur.blocks.length} block${cur.blocks.length === 1 ? '' : 's'}. Deploying replaces it. Save a copy on this device first?`,
+      [['save', 'Save copy, then deploy', 'primary'], ['go', 'Deploy without saving'], ['cancel', 'Cancel']],
+      h('label', { class: 'inline' }, dont, 'Don\'t ask again (can be changed under Settings)'));
+    if (ans === 'cancel') return false;
+    if (dont.checked) { store.set('eos.askSave', 'no'); $('#chkAskSave').checked = false; }
+    if (ans === 'save') download(new Blob([JSON.stringify(cur, null, 1)], { type: 'application/json' }), `espressos-program-${stamp()}.json`);
+    return true;
   }
 
   async function deploy() {
@@ -318,16 +417,17 @@
     if (document.activeElement && document.activeElement.matches('input, select')) document.activeElement.blur();
     const issues = validate(editor.prog).filter((i) => i.lvl === 'err');
     if (issues.length) { toast(issues[0].msg, true); showSide('props'); editor.select(null); return; }
+    if ($('#btnDeploy').disabled) return;  // a deploy (or its question) is already open
     $('#btnDeploy').disabled = true;
     try {
+      if (!(await okToReplace())) return;
       const r = await be.deploy(editor.prog);
       if (r && r.ok) {
         deployedJson = progJson(editor.prog);
         updateDirty();
         toast(be.kind === 'sim' ? (connReason === 'unreachable' ? 'Running in the simulator only: the board is not connected' : 'Running in simulator') : 'Deployed and running');
       } else toast('Rejected: ' + (r && r.err), true);
-    } catch (e) { toast('Deploy failed: ' + e.message, true); }
-    $('#btnDeploy').disabled = false;
+    } catch (e) { toast('Deploy failed: ' + e.message, true); } finally { $('#btnDeploy').disabled = false; }
     refreshInfo();
   }
 
@@ -347,6 +447,8 @@
       const rows = [['Firmware', i.version], ['Address', i.ip + (i.host ? ' (' + i.host + '.local)' : '')], ['Uptime', fmtUptime(i.uptime)],
         ['Free memory', i.heap ? Math.round(i.heap / 1024) + ' KB' : '–'], ['Program', i.blocks + ' blocks, ' + i.cycleMs + ' ms cycle'],
         ['Clock', i.timeSynced ? 'synced' : 'not synced (weekly timers inactive)'], ['Wi-Fi signal', i.rssi ? i.rssi + ' dBm' : '–']];
+      if (i.mqtt !== undefined) rows.push(['MQTT', i.mqtt]);
+      $('#mqttStatus').textContent = i.mqtt !== undefined ? i.mqtt : 'not available in the simulator';
       if (i.error) rows.push(['Last error', i.error]);
       for (const [k, v] of rows) dl.append(h('dt', {}, k), h('dd', {}, v));
     } catch {
@@ -452,10 +554,43 @@
       f.adminPass.placeholder = c.hasAdminPass ? 'unchanged' : 'none (open access)';
       $('#apKey').textContent = c.apKey || '';
       $('#apKeyInfo').hidden = !c.apKey;
+      fillMqtt(c.mqtt);
     } catch { /* offline */ }
     refreshInfo();
   }
+  function fillMqtt(m) {
+    const f = $('#formMqtt');
+    mqttCfg = m || null;
+    for (const el of f.elements) el.disabled = !m;
+    if (!m) { $('#mqttTopics').textContent = 'MQTT is only available on the board, not in the simulator.'; return; }
+    f.host.value = m.host || ''; f.port.value = m.port || 1883; f.user.value = m.user || '';
+    f.pass.value = ''; f.pass.placeholder = m.hasPass ? 'unchanged' : '';
+    f.base.value = m.base || ''; f.base.placeholder = m.defaultBase || 'espressos/<hostname>';
+    f.ha.checked = m.ha !== false; f.haPrefix.value = m.haPrefix || 'homeassistant';
+    mqttTopicsHelp();
+  }
+  function mqttTopicsHelp() {
+    const f = $('#formMqtt');
+    const b = (f.base.value.trim() || f.base.placeholder).replace(/\/+$/, '');
+    $('#mqttTopics').textContent = `Web control in slot N: state on ${b}/vN, commands to ${b}/vN/set (ON/OFF, PRESS or a number). Board status on ${b}/status.`;
+  }
   function initSettings() {
+    const fm = $('#formMqtt');
+    fm.base.addEventListener('input', mqttTopicsHelp);
+    fm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const m = { host: fm.host.value.trim(), port: Number(fm.port.value) || 1883, user: fm.user.value.trim(), base: fm.base.value.trim(), ha: fm.ha.checked, haPrefix: fm.haPrefix.value.trim() };
+      if (fm.pass.value) m.pass = fm.pass.value;
+      const r = await be.setConfig({ mqtt: m }).catch((x) => ({ ok: false, err: x.message }));
+      if (!r.ok) return toast(r.err, true);
+      fm.pass.value = '';
+      toast(m.host ? 'Saved. Connecting to the broker…' : 'Saved. MQTT is off.');
+      try { fillMqtt((await be.getConfig()).mqtt); } catch { /* keep form */ }
+      setTimeout(refreshInfo, 2500);
+    });
+    const ask = $('#chkAskSave');
+    ask.checked = store.get('eos.askSave') !== 'no';
+    ask.addEventListener('change', () => store.set('eos.askSave', ask.checked ? 'yes' : 'no'));
     const f = $('#formWifi');
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -477,10 +612,6 @@
       r.ok ? toast('Rebooting…') : toast(r.err, true);
     });
     $('#cycleMs').addEventListener('change', (e) => { editor.checkpoint(); editor.prog.cycleMs = Number(e.target.value); editor.changed(); });
-    const download = (blob, name) => {
-      const a = h('a', { href: URL.createObjectURL(blob), download: name });
-      document.body.append(a); a.click(); a.remove();
-    };
     $('#btnExport').addEventListener('click', () => download(new Blob([JSON.stringify(editor.prog, null, 1)], { type: 'application/json' }), 'espressos-program.json'));
     $('#btnExportXml').addEventListener('click', () => {
       const name = (editor.prog.name || 'EspressOS program');
@@ -511,13 +642,6 @@
         else toast('Imported. Press Deploy to send it to the board.');
       } catch (x) { toast('Import failed: ' + x.message, true); }
     });
-    $('#btnNew').addEventListener('click', () => {
-      if (!confirm('Clear the editor? The board keeps running its current program until you deploy.')) return;
-      editor.checkpoint();
-      editor.setProgram(Api.EMPTY(), true);
-      editor.changed();
-      $('.tab[data-tab=editor]').click();
-    });
     $('#btnOta').addEventListener('click', async () => {
       const file = $('#fileOta').files[0];
       if (!file) return toast('Choose a .bin file first', true);
@@ -544,6 +668,8 @@
     });
     initDevices();
     initSettings();
+    $('#btnNewSheet').onclick = newSheet;
+    $('#btnRestore').onclick = restoreDeployed;
     $('#btnUndo').onclick = () => editor.undo();
     $('#btnRedo').onclick = () => editor.redo();
     $('#btnFit').onclick = () => editor.fit();
@@ -570,7 +696,11 @@
     ({ be, reason: connReason } = await Api.connect());
     showConnBanner();
     try { builtDrivers = await be.drivers(); } catch { builtDrivers = null; }
-    try { const c = await be.getConfig(); if (c && Number.isInteger(c.sda)) i2cBus = { sda: c.sda, scl: c.scl }; } catch { /* keep defaults */ }
+    try {
+      const c = await be.getConfig();
+      if (c && Number.isInteger(c.sda)) i2cBus = { sda: c.sda, scl: c.scl };
+      mqttCfg = (c && c.mqtt) || null;
+    } catch { /* keep defaults */ }
 
     let prog;
     try { prog = await be.getProgram(); } catch { prog = Api.EMPTY(); }

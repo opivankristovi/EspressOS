@@ -3,6 +3,7 @@
 #include <driver/gpio.h>
 #include <time.h>
 
+#include "Mqtt.h"
 #include "Sensors.h"
 
 // Usable pins; keep in sync with OUT_PINS / IN_PINS / ADC_PINS in web/js/catalog.js.
@@ -74,6 +75,12 @@ void EspHal::writePwm(int pin, float duty) {
   ledcWrite(pin % 16, v);
 #endif
 }
+
+void EspHal::beginProgram() { Mqtt::resetTopics(); }
+int EspHal::mqttSubscribe(const char* topic) { return Mqtt::subscribe(topic); }
+bool EspHal::mqttValue(int handle, float* v) { return Mqtt::value(handle, v); }
+int EspHal::mqttAdvertise(const char* topic, bool retain) { return Mqtt::advertise(topic, retain); }
+void EspHal::mqttPublish(int handle, const char* payload) { Mqtt::publish(handle, payload); }
 
 float EspHal::readSensor(int dev, int channel, bool* ok) { return Sensors::value(dev, channel, ok); }
 

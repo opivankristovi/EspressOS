@@ -170,6 +170,14 @@
     }
     async drivers() { return root.Catalog.DRIVERS.map((d) => d.id); }
     async getConfig() { return { ssid: '', host: 'espressos', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass: false }; }
+    // A message on an MQTT topic, as if the broker delivered it. False if the payload is not understood.
+    setMqtt(topic, text) {
+      const v = root.Sim.parsePayload(text);
+      if (v === null) return false;
+      (this.hal.mqttIn || (this.hal.mqttIn = {}))[topic] = v;
+      this._tick(); this._emit();
+      return true;
+    }
     async setConfig() { return { ok: false, err: 'Not available in simulation mode' }; }
     async reboot() { return { ok: false, err: 'Not available in simulation mode' }; }
     async ota() { return { ok: false, err: 'Not available in simulation mode' }; }

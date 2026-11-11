@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "Engine.h"
 
@@ -20,6 +21,21 @@ struct FakeHal : Hal {
   void writeDigital(int pin, bool v) override { dout[pin] = v; }
   float readVirtual(int i) override { return vin[i]; }
   void safeOutputs() override { safeCalls++; dout.clear(); }
+  // MQTT: topics by handle, like the firmware's slot tables
+  std::vector<std::string> subs, pubs;
+  std::map<std::string, float> msg;                        // last message per topic
+  std::vector<std::pair<std::string, std::string>> sent;   // (topic, payload)
+  int beginCalls = 0;
+  void beginProgram() override { beginCalls++; subs.clear(); pubs.clear(); }
+  int mqttSubscribe(const char* t) override { subs.push_back(t); return (int)subs.size() - 1; }
+  bool mqttValue(int h, float* v) override {
+    auto it = msg.find(subs[h]);
+    if (it == msg.end()) return false;
+    *v = it->second;
+    return true;
+  }
+  int mqttAdvertise(const char* t, bool) override { pubs.push_back(t); return (int)pubs.size() - 1; }
+  void mqttPublish(int h, const char* p) override { sent.push_back({pubs[h], p}); }
   const char* pinProblem(int pin, PinUse use) override {
     if (pin == 7) return "belongs to the flash chip";
     if (pin == 34 && use == PinUse::DigitalOut) return "is input-only";
@@ -224,6 +240,56 @@ void test_bad_pins_rejected() {
   TEST_ASSERT_TRUE(eng->load(R"({"blocks":[{"id":1,"type":"DI","p":{"pin":4}},{"id":2,"type":"DI","p":{"pin":4}}],"wires":[]})", err));
 }
 
+// MQTT in -> value and Q; value -> MQTT out (number), Q -> MQTT out (ON/OFF), every 1 s
+static const char* kMqtt =
+    R"({"blocks":[{"id":1,"type":"MQTTIN","p":{"topic":"t/in","def":0.75}},
+    {"id":2,"type":"MQTTOUT","p":{"topic":"t/num","fmt":"num","dec":2,"every":1}},
+    {"id":3,"type":"MQTTOUT","p":{"topic":"t/sw","fmt":"onoff","every":0}}],
+    "wires":[[1,0,2,0],[1,1,3,0]]})";
+
+void test_mqtt_in_out() {
+  load(kMqtt);
+  TEST_ASSERT_EQUAL(1, hal.subs.size());
+  TEST_ASSERT_EQUAL(2, hal.pubs.size());
+  eng->scan(0);  // no message yet: default value
+  TEST_ASSERT_EQUAL_FLOAT(0.75f, eng->output(1, 0));
+  TEST_ASSERT_EQUAL_FLOAT(1, eng->output(1, 1));
+  TEST_ASSERT_EQUAL(2, hal.sent.size());
+  TEST_ASSERT_EQUAL_STRING("0.75", hal.sent[0].second.c_str());
+  TEST_ASSERT_EQUAL_STRING("ON", hal.sent[1].second.c_str());
+  hal.msg["t/in"] = 21.5f;
+  eng->scan(100);  // ON -> ON: nothing new on t/sw; t/num waits for its 1 s interval
+  TEST_ASSERT_EQUAL(2, hal.sent.size());
+  eng->scan(1000);
+  TEST_ASSERT_EQUAL(3, hal.sent.size());
+  TEST_ASSERT_EQUAL_STRING("t/num", hal.sent[2].first.c_str());
+  TEST_ASSERT_EQUAL_STRING("21.5", hal.sent[2].second.c_str());
+  hal.msg["t/in"] = 0;
+  eng->scan(1100);
+  TEST_ASSERT_EQUAL(4, hal.sent.size());  // the switch reacts at once
+  TEST_ASSERT_EQUAL_STRING("OFF", hal.sent[3].second.c_str());
+  eng->scan(2000);
+  TEST_ASSERT_EQUAL_STRING("0", hal.sent[4].second.c_str());
+  eng->scan(3000);
+  TEST_ASSERT_EQUAL(5, hal.sent.size());  // unchanged values are not sent again
+}
+
+void test_mqtt_topics_checked() {
+  std::string err;
+  TEST_ASSERT_FALSE(eng->load(R"({"blocks":[{"id":1,"type":"MQTTIN","p":{"topic":""}}],"wires":[]})", err));
+  TEST_ASSERT_EQUAL_STRING("Block 1 has no MQTT topic", err.c_str());
+  TEST_ASSERT_FALSE(eng->load(R"({"blocks":[{"id":1,"type":"MQTTOUT","p":{"topic":"a/#"}}],"wires":[]})", err));
+  TEST_ASSERT_EQUAL_STRING("Block 1 MQTT topic must not contain the wildcards + or #", err.c_str());
+  std::string many = R"({"wires":[],"blocks":[)";
+  for (int i = 1; i <= 17; i++) many += (i > 1 ? "," : "") + std::string(R"({"id":)") + std::to_string(i) + R"(,"type":"MQTTIN","p":{"topic":"t)" + std::to_string(i) + R"("}})";
+  many += "]}";
+  TEST_ASSERT_FALSE(eng->load(many.c_str(), err));
+  TEST_ASSERT_EQUAL_STRING("More than 16 MQTT topics in one direction", err.c_str());
+  int before = hal.beginCalls;
+  load(kMqtt);
+  TEST_ASSERT_EQUAL(before + 2, hal.beginCalls);  // load + run each start the program fresh
+}
+
 void test_snapshot_json() {
   load(R"({"blocks":[{"id":5,"type":"CONST","p":{"value":2.5}}],"wires":[]})");
   eng->scan(0);
@@ -247,5 +313,7 @@ int main() {
   RUN_TEST(test_inverted_output_starts_at_off_level);
   RUN_TEST(test_snapshot_json);
   RUN_TEST(test_bad_pins_rejected);
+  RUN_TEST(test_mqtt_in_out);
+  RUN_TEST(test_mqtt_topics_checked);
   return UNITY_END();
 }

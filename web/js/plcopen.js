@@ -515,6 +515,23 @@ END_IF;`,
           setOut(b, 0, e, 'OUT', 'REAL');
           break;
         }
+        case 'MQTTIN': {
+          const topic = String(p.topic || '');
+          const def = Number(p.def) || 0;
+          const v = declare('MQ_' + (b.note || topic || 'B' + b.id), 'REAL', { init: fmtReal(def), doc: 'EspressOS MQTT in: value received on ' + topic, role: { kind: 'mqtt', part: 'v', block: b.id, topic, def } });
+          setOut(b, 0, inVar(v, x, y, { eos }), null, 'REAL');
+          const q = declare(v + '_Q', 'BOOL', { init: Math.fround(def) >= 0.5 ? 'TRUE' : 'FALSE', doc: 'TRUE while ' + v + ' is 0.5 or more', role: { kind: 'mqtt', part: 'q', block: b.id, topic, def } });
+          setOut(b, 1, inVar(q, x, y + 40), null, 'BOOL');
+          warnings.push(`B${b.id}: MQTT in (${topic}) has no IEC equivalent. It is exported as variables ${v} and ${q}; set them from your PLC's own communication.`);
+          break;
+        }
+        case 'MQTTOUT': {
+          const topic = String(p.topic || '');
+          const v = declare('MQO_' + (b.note || topic || 'B' + b.id), 'REAL', { doc: 'EspressOS MQTT out: published to ' + topic, role: { kind: 'mqttout', block: b.id, topic } });
+          need(outVar(v, x, y, { eos }), 'src', b, 0, 'REAL', '0.0');
+          warnings.push(`B${b.id}: MQTT out (${topic}) has no IEC equivalent. The value is written to variable ${v}; publish it with your PLC's own communication.`);
+          break;
+        }
         default:
           warnings.push(`B${b.id}: block type ${b.type} cannot be exported and was left out.`);
       }
@@ -820,6 +837,11 @@ END_IF;`,
           mapOut(e, '', b.id, 0);
           const okVar = [...el.values()].find((o) => o.tag === 'inVariable' && o.expr.toUpperCase() === (e.expr + '_OK').toUpperCase());
           if (okVar) mapOut(okVar, '', b.id, 1);
+        } else if (eos && eos.type === 'MQTTIN') {
+          const b = addBlock('MQTTIN', e.x, e.y, eos.p, { note: eos.note, wantId: takeId(eos.id) });
+          mapOut(e, '', b.id, 0);
+          const qVar = [...el.values()].find((o) => o.tag === 'inVariable' && o.expr.toUpperCase() === (e.expr + '_Q').toUpperCase());
+          if (qVar) mapOut(qVar, '', b.id, 1);
         } else if (/^%I[X]/.test(a) || (eos && eos.type === 'DI')) {
           const p = eos ? eos.p : {};
           const b = addBlock('DI', e.x, e.y, { pull: p.pull !== undefined ? p.pull : 0, inv: e.neg ? 1 : 0, pin: pickPin(C.IN_PINS, p.pin, 'Digital input', e.expr) }, { note: noteOf(eos, info.name), wantId: takeId(eos && eos.id) });
@@ -851,7 +873,10 @@ END_IF;`,
         const a = (info.address || '').toUpperCase();
         const eos = e.eos;
         const readers = [...el.values()].some((o) => o.tag === 'inVariable' && o.expr.toUpperCase() === e.expr.toUpperCase());
-        if (/^%QX/.test(a) || (eos && eos.type === 'DO')) {
+        if (eos && eos.type === 'MQTTOUT') {
+          const b = addBlock('MQTTOUT', e.x, e.y, eos.p, { note: eos.note, wantId: takeId(eos.id) });
+          if (e.in) toConnect.push({ bid: b.id, port: 0, conn: e.in, neg: false });
+        } else if (/^%QX/.test(a) || (eos && eos.type === 'DO')) {
           const p = eos ? eos.p : {};
           const b = addBlock('DO', e.x, e.y, { inv: e.neg ? 1 : 0, pin: pickPin(C.OUT_PINS, p.pin, 'Digital output', e.expr) }, { note: noteOf(eos, info.name), wantId: takeId(eos && eos.id) });
           if (e.in) toConnect.push({ bid: b.id, port: 0, conn: e.in, neg: false });

@@ -12,6 +12,8 @@ namespace eos {
 
 constexpr int kMaxIn = 4;
 constexpr int kMaxOut = 2;
+constexpr int kMaxMqtt = 16;       // MQTT topics per direction (in / out)
+constexpr int kMaxTopicLen = 96;
 
 class Engine;
 

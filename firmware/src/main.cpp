@@ -15,6 +15,7 @@
 
 #include "Engine.h"
 #include "EspHal.h"
+#include "Mqtt.h"
 #include "Sensors.h"
 
 #ifndef EOS_VERSION
@@ -35,6 +36,7 @@ struct Config {
   String apKey;                  // WPA2 key of the fallback setup network once an admin password exists
   String tz = "CET-1CEST,M3.5.0,M10.5.0/3";
   int sda = 21, scl = 22;
+  Mqtt::Settings mqtt;
 };
 
 static Config cfg;
@@ -212,6 +214,14 @@ static void loadConfig() {
   cfg.scl = d["scl"] | 22;
   cfg.apKey = d["apKey"] | "";
   if (!validI2cPins(cfg.sda, cfg.scl)) { cfg.sda = 21; cfg.scl = 22; }  // never let a bad config brick the board
+  JsonObjectConst m = d["mqtt"];
+  cfg.mqtt.host = m["host"] | "";
+  cfg.mqtt.port = m["port"] | 1883;
+  cfg.mqtt.user = m["user"] | "";
+  cfg.mqtt.pass = m["pass"] | "";
+  cfg.mqtt.base = m["base"] | "";
+  cfg.mqtt.ha = m["ha"] | true;
+  cfg.mqtt.haPrefix = m["haPrefix"] | "homeassistant";
   String legacy = d["adminPass"] | "";  // v0.1.0 stored it in plain text
   if (legacy.length() && cfg.adminHash.isEmpty()) setAdminPassword(legacy);
 }
@@ -227,9 +237,45 @@ static bool saveConfig() {
   d["sda"] = cfg.sda;
   d["scl"] = cfg.scl;
   d["apKey"] = cfg.apKey;
+  JsonObject m = d["mqtt"].to<JsonObject>();
+  m["host"] = cfg.mqtt.host;
+  m["port"] = cfg.mqtt.port;
+  m["user"] = cfg.mqtt.user;
+  m["pass"] = cfg.mqtt.pass;
+  m["base"] = cfg.mqtt.base;
+  m["ha"] = cfg.mqtt.ha;
+  m["haPrefix"] = cfg.mqtt.haPrefix;
   String s;
   serializeJson(d, s);
   return writeFile(kConfigFile, s.c_str(), s.length());
+}
+
+// MQTT settings from a /api/config request, checked before anything changes.
+// The password is only replaced when one is sent; an empty user name clears it.
+static bool topicOk(const String& t) { return t.length() <= 64 && t.indexOf('+') < 0 && t.indexOf('#') < 0; }
+
+static bool readMqttSettings(JsonObjectConst m, Mqtt::Settings& s, String& why) {
+  if (m["host"].is<const char*>()) s.host = m["host"].as<const char*>();
+  s.host.trim();
+  bool okHost = s.host.length() <= 64;
+  for (char c : s.host) okHost &= isalnum((unsigned char)c) || c == '.' || c == '-' || c == '_';
+  if (!okHost) { why = "MQTT broker: use a host name or IP address (letters, digits, '.', '-')"; return false; }
+  if (m["port"].is<int>()) s.port = m["port"].as<int>();
+  if (s.port < 1 || s.port > 65535) { why = "MQTT port must be 1-65535"; return false; }
+  if (m["user"].is<const char*>()) s.user = m["user"].as<const char*>();
+  if (m["pass"].is<const char*>()) s.pass = m["pass"].as<const char*>();
+  if (s.user.isEmpty()) s.pass = "";
+  if (s.user.length() > 64 || s.pass.length() > 64) { why = "MQTT user name and password: at most 64 characters"; return false; }
+  if (m["base"].is<const char*>()) s.base = m["base"].as<const char*>();
+  s.base.trim();
+  while (s.base.endsWith("/")) s.base.remove(s.base.length() - 1);
+  if (!topicOk(s.base)) { why = "MQTT base topic: at most 64 characters, no + or #"; return false; }
+  if (m["ha"].is<bool>()) s.ha = m["ha"].as<bool>();
+  if (m["haPrefix"].is<const char*>()) s.haPrefix = m["haPrefix"].as<const char*>();
+  s.haPrefix.trim();
+  if (s.haPrefix.isEmpty()) s.haPrefix = "homeassistant";
+  if (!topicOk(s.haPrefix)) { why = "Discovery prefix: at most 64 characters, no + or #"; return false; }
+  return true;
 }
 
 // ------------------------------------------------------------------ engine
@@ -259,9 +305,34 @@ static bool deploy(const char* json, String& err) {
     Sensors::configure(devs);
     engine.run();
   }
+  uint32_t cycle = engine.cycleMs();
   xSemaphoreGive(engineLock);
-  if (!ok) err = eerr.c_str();
-  return ok;
+  if (!ok) {
+    err = eerr.c_str();
+    return false;
+  }
+  // Web controls become MQTT topics (and Home Assistant entities).
+  std::vector<Mqtt::Entity> ents;
+  for (JsonObjectConst b : doc["blocks"].as<JsonArrayConst>()) {
+    if (strcmp(b["type"] | "", "VIN") != 0) continue;
+    JsonObjectConst p = b["p"];
+    Mqtt::Entity e;
+    e.idx = p["idx"] | 0;
+    if (e.idx < 0 || e.idx >= EspHal::kVirtual) continue;
+    e.name = p["name"] | "";
+    if (!strcmp(b["ui"] | "", "VSLIDER")) {
+      e.kind = 'n';
+      e.min = p["min"] | 0.0f;
+      e.max = p["max"] | 100.0f;
+      e.step = p["step"] | 1.0f;
+    } else {
+      e.kind = !strcmp(p["mode"] | "", "button") ? 'b' : 's';
+    }
+    ents.push_back(e);
+  }
+  Mqtt::setEntities(ents);
+  Mqtt::setCycleMs(cycle);
+  return true;
 }
 
 static void engineSetRunning(bool run) {
@@ -577,6 +648,7 @@ static void setupRoutes() {
     d["cycles"] = engine.cycles();
     xSemaphoreGive(engineLock);
     d["error"] = lastError;
+    d["mqtt"] = Mqtt::statusText();
     time_t now = time(nullptr);
     d["timeSynced"] = now > 1700000000;
     d["time"] = (uint32_t)now;
@@ -647,6 +719,15 @@ static void setupRoutes() {
     d["scl"] = cfg.scl;
     d["hasAdminPass"] = !setupMode();
     d["apKey"] = setupMode() ? "" : cfg.apKey;  // only ever sent to a logged-in admin
+    JsonObject m = d["mqtt"].to<JsonObject>();
+    m["host"] = cfg.mqtt.host;
+    m["port"] = cfg.mqtt.port;
+    m["user"] = cfg.mqtt.user;
+    m["hasPass"] = cfg.mqtt.pass.length() > 0;  // the password itself is never sent back
+    m["base"] = cfg.mqtt.base;
+    m["defaultBase"] = "espressos/" + cfg.host;
+    m["ha"] = cfg.mqtt.ha;
+    m["haPrefix"] = cfg.mqtt.haPrefix;
     String s;
     serializeJson(d, s);
     sendJson(r, 200, s);
@@ -664,6 +745,12 @@ static void setupRoutes() {
         int sda = d["sda"].is<int>() ? d["sda"].as<int>() : cfg.sda;
         int scl = d["scl"].is<int>() ? d["scl"].as<int>() : cfg.scl;
         if (!validI2cPins(sda, scl)) return sendResult(r, false, "I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)");
+        Mqtt::Settings mq = cfg.mqtt;
+        bool mqttChanged = d["mqtt"].is<JsonObjectConst>();
+        if (mqttChanged) {
+          String why;
+          if (!readMqttSettings(d["mqtt"], mq, why)) return sendResult(r, false, why);
+        }
         if (d["host"].is<const char*>()) {
           String h = d["host"].as<const char*>();
           bool okName = h.length() >= 1 && h.length() <= 32;
@@ -677,6 +764,8 @@ static void setupRoutes() {
         if (newPass) setAdminPassword(newPass);  // takes effect immediately
         cfg.sda = sda;
         cfg.scl = scl;
+        cfg.mqtt = mq;
+        if (mqttChanged) Mqtt::configure(cfg.mqtt);  // reconnects right away
         if (!saveConfig()) return sendResult(r, false, "Could not save the settings to flash");
         sendResult(r, true, "");
       },
@@ -718,6 +807,7 @@ void setup() {
   if (migrate) saveConfig();
   engineLock = xSemaphoreCreateMutex();
   Sensors::begin(cfg.sda, cfg.scl);
+  Mqtt::begin(&hal, cfg.host, cfg.mqtt);  // before deploy(): programs register their topics
 
   String prog = readJsonFile(kProgramFile);
   if (prog.length()) {

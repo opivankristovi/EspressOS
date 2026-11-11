@@ -31,6 +31,8 @@ const engine = new Engine(new MockHal());
 let program = { version: 1, cycleMs: 10, blocks: [], wires: [], devices: [] };
 let lastError = '';
 let hasAdminPass = process.argv.includes('--configured');
+let mqtt = { host: '', port: 1883, user: '', pass: '', base: '', ha: true, haPrefix: 'homeassistant' };
+const mqttPublic = () => ({ host: mqtt.host, port: mqtt.port, user: mqtt.user, hasPass: !!mqtt.pass, base: mqtt.base, defaultBase: 'espressos/mock', ha: mqtt.ha, haPrefix: mqtt.haPrefix });
 const validI2c = (a, b) => Number.isInteger(a) && Number.isInteger(b) && a !== b && [a, b].every((p) => p >= 0 && p < 34 && !(p >= 6 && p <= 11) && ![20, 24, 28, 29, 30, 31].includes(p));
 const t0 = Date.now();
 setInterval(() => engine.scan(Date.now() - t0), 10);
@@ -42,7 +44,7 @@ function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'applicati
 
 const routes = {
   'GET /api/info': () => ({ version: '0.1.0-mock', uptime: Math.round((Date.now() - t0) / 1000), heap: 182000, ap: false, ip: '127.0.0.1', rssi: -55,
-    host: 'mock', setup: !hasAdminPass, running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true }),
+    host: 'mock', setup: !hasAdminPass, mqtt: mqtt.host ? 'cannot reach the broker (retrying)' : 'off', running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true }),
   'GET /api/program': () => program,
   'POST /api/program': (b) => {
     let p; try { p = JSON.parse(b); } catch (e) { return { status: 400, body: { ok: false, err: 'JSON: ' + e.message } }; }
@@ -65,12 +67,21 @@ const routes = {
   },
   'GET /api/drivers': () => ['BME280', 'SHT31', 'BH1750', 'DS18B20', 'ADS1115', 'I2C_GENERIC'],
   'GET /api/i2c/scan': () => ({ sda: 21, scl: 22, found: [0x23, 0x3c, 0x76] }),
-  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass, apKey: hasAdminPass ? 'k7mq2xw9hpta' : '' }),
+  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass, apKey: hasAdminPass ? 'k7mq2xw9hpta' : '', mqtt: mqttPublic() }),
   'POST /api/config': (b) => {
     let d; try { d = JSON.parse(b); } catch { return { status: 400, body: { ok: false, err: 'Bad JSON' } }; }
     if (!hasAdminPass && !d.adminPass) return { status: 400, body: { ok: false, err: 'Choose an admin password first' } };
     if (d.adminPass !== undefined && String(d.adminPass).length < 8) return { status: 400, body: { ok: false, err: 'Admin password needs at least 8 characters' } };
     if (!validI2c(d.sda ?? 21, d.scl ?? 22)) return { status: 400, body: { ok: false, err: 'I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)' } };
+    if (d.mqtt) {
+      const m = { ...mqtt, ...d.mqtt };
+      if (!/^[A-Za-z0-9._-]{0,64}$/.test(m.host)) return { status: 400, body: { ok: false, err: "MQTT broker: use a host name or IP address (letters, digits, '.', '-')" } };
+      if (!(m.port >= 1 && m.port <= 65535)) return { status: 400, body: { ok: false, err: 'MQTT port must be 1-65535' } };
+      if (/[+#]/.test(m.base) || /[+#]/.test(m.haPrefix)) return { status: 400, body: { ok: false, err: 'MQTT base topic: at most 64 characters, no + or #' } };
+      if (!m.user) m.pass = '';
+      m.haPrefix = m.haPrefix || 'homeassistant';
+      mqtt = m;
+    }
     if (d.adminPass) hasAdminPass = true;
     return { ok: true };
   },

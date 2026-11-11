@@ -42,6 +42,18 @@
       params: [{ key: 'dev', label: 'Device', type: 'device', def: 0 }, { key: 'ch', label: 'Channel', type: 'channel', def: 0 }],
       help: 'Reads one channel of a sensor configured on the Devices tab. "ok" is low when the sensor does not answer.' },
 
+    // ---- MQTT
+    { type: 'MQTTIN', cat: 'mqtt', label: 'MQTT in', sym: '⇣', ins: [], outs: [a('#'), d('Q')],
+      params: [{ key: 'topic', label: 'Topic', type: 'text', def: 'espressos/in' }, num('def', 'Value until the first message', 0)],
+      sum: (p) => p.topic,
+      help: 'Receives messages on an MQTT topic. # is the value (ON/true = 1, OFF/false = 0, or a number), Q is on when it is 0.5 or more. Set up the broker in Settings.' },
+    { type: 'MQTTOUT', cat: 'mqtt', label: 'MQTT out', sym: '⇡', ins: [a('')], outs: [],
+      params: [{ key: 'topic', label: 'Topic', type: 'text', def: 'espressos/out' },
+        { key: 'fmt', label: 'Send as', type: 'select', options: [['num', 'Number'], ['onoff', 'ON / OFF'], ['bool', 'true / false'], ['01', '1 / 0']], def: 'num' },
+        num('dec', 'Decimals (numbers)', 2, '', 1), num('every', 'At most every', 1, 's', 0.1), bool('retain', 'Retain (broker keeps the last value)', 1)],
+      sum: (p) => p.topic,
+      help: 'Publishes its input to an MQTT topic whenever the value changes, at most once per interval. Set up the broker in Settings.' },
+
     // ---- logic
     { type: 'AND', cat: 'logic', label: 'AND', sym: '&', ins: [d(''), d(''), d(''), d('')], outs: [d('')], params: [],
       help: 'High when all connected inputs are high.' },
@@ -92,7 +104,7 @@
       help: 'Output is B when S is high, A otherwise.' },
   ];
 
-  const CATS = [['io', 'Inputs & outputs'], ['sensor', 'Sensors'], ['logic', 'Logic'], ['timer', 'Timers & counters'], ['analog', 'Analog']];
+  const CATS = [['io', 'Inputs & outputs'], ['sensor', 'Sensors'], ['logic', 'Logic'], ['timer', 'Timers & counters'], ['analog', 'Analog'], ['mqtt', 'MQTT']];
 
   const DRIVERS = [
     { id: 'BME280', label: 'BME280 temp / humidity / pressure', bus: 'i2c', addrs: [0x76, 0x77],

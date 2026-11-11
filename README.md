@@ -10,10 +10,11 @@ Remember Siemens LOGO!? You drop AND gates, timers and counters on a sheet, draw
 
 ## Why you'll like it
 
-- **Programs in minutes, not compile cycles.** Changes take effect the moment you press Deploy. A bad program is rejected and the old one keeps running.
+- **Programs in minutes, not compile cycles.** Changes take effect the moment you press Deploy. A bad program is rejected and the old one keeps running. **Restore** throws away your edits and brings back what's on the board, and before a deploy replaces a program, EspressOS offers to save a copy of it.
 - **See your logic think.** Wires glow green when high, analog values ride along the wires, and timers count down inside their blocks, just like LOGO!'s online test.
 - **Sensors without code.** Scan the I²C bus, click the BME280 it found, and drop a *Sensor value* block. Temperature, humidity, pressure, light, voltage and 1-Wire temperature work out of the box. A *generic I²C register* reader covers many other chips.
 - **A control panel for free.** Add web switches, push buttons and setpoints to your program, and they show up as controls on the Live panel, from any phone on your network.
+- **Talks to Home Assistant.** *MQTT in* and *MQTT out* blocks connect your logic to any MQTT broker, and web switches, push buttons and setpoints appear in Home Assistant on their own through MQTT discovery.
 - **Try it before you solder.** With no board connected, the same engine runs as a simulator in your browser. Click inputs to toggle them and watch the outputs respond.
 - **Built like a controller, not a toy.** Fixed 10 ms scan cycle on its own CPU core, outputs released to a safe state on stop or redeploy, a watchdog, and the program kept in flash across power cycles.
 - **Speaks IEC 61131-3.** Export to PLCopen XML for OpenPLC, Beremiz and other IEC tools, and import their FBD programs.
@@ -39,6 +40,7 @@ Remember Siemens LOGO!? You drop AND gates, timers and counters on a sheet, draw
 | **Timers & counters** | On-delay, off-delay, pulse, blinker, weekly timer (NTP clock), up/down counter |
 | **Analog** | Compare, threshold with hysteresis, math (+ − × ÷ min max), scale, select |
 | **Sensors** | BME280, SHT3x, BH1750, ADS1115, DS18B20, generic I²C register |
+| **MQTT** | MQTT in (value and on/off from a topic), MQTT out (publishes a value when it changes) |
 
 ![Sensors page after an I²C scan, showing two configured sensors with live readings](docs/screenshots/sensors.png)
 
@@ -72,11 +74,12 @@ Pin notes: I²C defaults to SDA 21 / SCL 22 (changeable in Settings); while a pr
 
 ```
 Browser ──HTTP/WebSocket──► ESP32
-  editor + simulator           ├─ web server: UI from LittleFS (gzipped, ~50 KB)
+  editor + simulator           ├─ web server: UI from LittleFS (gzipped, ~56 KB)
   (web/)                       ├─ REST API  /api/program, /api/run, /api/stop, /api/vin, /api/i2c/scan, /api/config, /api/ota
                                ├─ WebSocket /ws  live values, 4×/s
                                ├─ engine task (core 1): scan cycle every 10 ms
-                               └─ sensor task (core 0): polls sensors, caches values
+                               ├─ sensor task (core 0): polls sensors, caches values
+                               └─ MQTT task (core 0): broker connection, Home Assistant discovery
 ```
 
 A program is plain JSON: blocks, wires `[fromId, fromPort, toId, toPort]` and sensor devices. You can version it in git or share it like the [greenhouse example](examples/greenhouse.json). On deploy the board validates it and sorts the blocks so each runs after its inputs. Feedback loops are allowed and read the previous cycle's value, as on a PLC.
@@ -92,9 +95,25 @@ A program is plain JSON: blocks, wires `[fromId, fromPort, toId, toPort]` and se
 - Settings and the program are saved atomically, with a backup copy, so a power cut while saving can't corrupt them. If the settings were ever unreadable anyway, the board refuses all logins rather than falling back to the open first-setup mode; erase it over USB to start over.
 - Firmware updates accept only a real firmware image or web UI image. Any other file is refused, so picking the wrong `.bin` can't wipe the web interface.
 
-Known limits: HTTP Basic auth over plain HTTP, so use it on a network you trust. The Wi-Fi password is stored readably, because the board needs it to connect. Firmware images aren't signed; ESP32 secure boot and flash encryption are the proper fix for both.
+Known limits: HTTP Basic auth over plain HTTP, so use it on a network you trust. The Wi-Fi and MQTT passwords are stored readably, because the board needs them to connect, and MQTT runs without TLS. Firmware images aren't signed; ESP32 secure boot and flash encryption are the proper fix for both.
 
 **Adding a sensor driver.** The ESP32 can't compile code itself, so drivers are built into the firmware. To add one, write a small class in `firmware/src/Sensors.cpp`, list it in `DRIVERS` in `web/js/catalog.js`, rebuild, and upload `firmware.bin` from **Settings → Firmware update**. Until then, the generic I²C block handles many simple chips.
+
+## MQTT and Home Assistant
+
+Enter your broker under **Settings → MQTT & Home Assistant**: host or IP, port, and a user name and password if the broker needs them. If you run Home Assistant, its Mosquitto add-on is the usual broker. Changes apply at once, without a reboot, and the status line shows whether the board is connected.
+
+**MQTT in** subscribes to a topic. Its `#` output is the value of the last message: `ON`, `true`, `open`, `yes` and `PRESS` count as 1, `OFF`, `false`, `closed` and `no` as 0, and anything else must be a number. Its `Q` output is on while that value is 0.5 or more. Until the first message arrives, the block outputs the value you set. **MQTT out** publishes its input whenever the formatted value changes, as a number (with the decimals you choose), `ON`/`OFF`, `true`/`false` or `1`/`0`. It sends at most once per interval (1 s by default), but always ends on the latest value, and it retains the message by default so new subscribers get the current state. Topics can't contain the wildcards `+` or `#`, and a program can use up to 16 topics in each direction.
+
+Every web control is also an MQTT topic under the base topic, which is `espressos/<hostname>` unless you set another:
+
+| Topic | Direction | Payload |
+|---|---|---|
+| `<base>/vN` | board → broker (retained) | `ON`/`OFF` for switches and buttons, the number for setpoints |
+| `<base>/vN/set` | broker → board | `ON`/`OFF`, `PRESS` (a short press of a push button), or a number (clamped to the setpoint's range) |
+| `<base>/status` | board → broker (retained) | `online`, or `offline` (the broker's last will) |
+
+`N` is the web control's slot. With **Home Assistant discovery** on (the default), each web switch shows up as a switch entity, each push button as a button entity and each setpoint as a number slider, all grouped under one device named after the board. Deploying a program updates the entities; web controls you delete are removed from Home Assistant too.
 
 ## IEC 61131-3 / OpenPLC interoperability
 
@@ -113,6 +132,7 @@ Known limits: HTTP Basic auth over plain HTTP, so use it on a network you trust.
 | Analog in / PWM out | `%IWn` / `%QWn` through `EOS_AI` / `EOS_AO` (0–65535 like OpenPLC) |
 | Blinker, Threshold, Scale, Weekly timer | `EOS_BLINK`, `EOS_THRESH`, `EOS_SCALE`, `EOS_WEEK`, written in Structured Text and included in the file |
 | Web switch / setpoint, Sensor value | plain variables (`V0_…`, `S_…`) |
+| MQTT in / MQTT out | plain variables (`MQ_…` and `MQ_…_Q` / `MQO_…`) |
 
 Feedback loops are routed through a variable, which gives the same one-cycle delay. GPIO pins, block numbers and sensor settings travel in the file's `addData` section, so an exported program imports back unchanged.
 
@@ -124,14 +144,14 @@ When importing a file from another tool:
 
 Limits:
 - OpenPLC sets ESP32 pins per board, so after exporting, copy the I/O table the export shows into OpenPLC's board settings.
-- Sensors and the weekly timer's clock have no IEC equivalent. They're exported as variables you feed from your PLC (`S_…`, `CLOCK_DOW` / `CLOCK_MINUTE`). Weekly timers stay off until you also set `CLOCK_VALID`, just like EspressOS keeps them off until its clock is synced.
+- Sensors, MQTT and the weekly timer's clock have no IEC equivalent. They're exported as variables you connect in your PLC (`S_…`, `MQ_…`, `MQO_…`, `CLOCK_DOW` / `CLOCK_MINUTE`). Weekly timers stay off until you also set `CLOCK_VALID`, just like EspressOS keeps them off until its clock is synced.
 - The PWM frequency of an analog output isn't exported; OpenPLC uses its board's own.
 - Inverted digital inputs and outputs are exported as `NOT` blocks, because OpenPLC ignores inversion marks on variables. EspressOS folds them back in when you re-import.
 
 Every push runs the [IEC check](.github/workflows/iec.yml) on GitHub Actions:
 1. Export the [examples](examples/) and validate them against the official PLCopen schema.
 2. Convert them to Structured Text with OpenPLC Editor's own generator, and compile the result with OpenPLC's `matiec` compiler and `gcc`, exactly as OpenPLC does before uploading to a board.
-3. Run the compiled programs for 3,000 scan cycles on random inputs (switches, analog values, sensors, the clock) next to EspressOS's engine, and check that every output matches on every cycle.
+3. Run the compiled programs for 3,000 scan cycles on random inputs (switches, analog values, sensors, MQTT messages, the clock) next to EspressOS's engine, and check that every output matches on every cycle.
 
 ## Development
 
@@ -152,16 +172,16 @@ The engine is implemented twice: in C++ for the board (`firmware/lib/engine`) an
 ## Status
 
 EspressOS is young. Two self-reviews found 29 issues across security, controller behaviour, IEC export and the interface, and all have been fixed. Tested on every push:
-- C++ engine: 15 tests. JS engine: 18 tests.
+- C++ engine: 17 tests. JS engine: 20 tests.
 - PLCopen import/export: 9 tests, including schema validation and checking that a program behaves the same after export and re-import.
 - OpenPLC: the exports compile with `matiec` and behave the same as in EspressOS.
-- The firmware build: 1.57 MB of the 1.9 MB app slot.
+- The firmware build: 1.64 MB of the 1.9 MB app slot.
 
 The complete editor flow is tested by hand against the mock board and the simulator.
 
-**Runs on real hardware.** EspressOS has been flashed to an ESP32 dev board (ESP32-D0WD-V3, CH340 USB). It booted cleanly, went through the setup page, joined the home Wi-Fi and served the editor. A deployed program then switched the on-board LED (GPIO 2) live from a web switch, analog inputs read a joystick's position, and a PWM output dimmed the LED from both a web setpoint and the joystick. The board stayed cool throughout. A firmware update over Wi-Fi rebooted the board with its program intact, and uploading the wrong `.bin` (`partitions.bin`) was refused with an error. Not yet tried on hardware: sensor drivers and the fallback network after a router outage. Reports from other boards are very welcome.
+**Runs on real hardware.** EspressOS has been flashed to an ESP32 dev board (ESP32-D0WD-V3, CH340 USB). It booted cleanly, went through the setup page, joined the home Wi-Fi and served the editor. A deployed program then switched the on-board LED (GPIO 2) live from a web switch, analog inputs read a joystick's position, and a PWM output dimmed the LED from both a web setpoint and the joystick. The board stayed cool throughout. A firmware update over Wi-Fi rebooted the board with its program intact, and uploading the wrong `.bin` (`partitions.bin`) was refused with an error. Not yet tried on hardware: sensor drivers, the fallback network after a router outage, and MQTT with Home Assistant (new, and so far tested only against the simulator and mock board). Reports from other boards are very welcome.
 
-On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
+On the roadmap: Modbus RTU and UART blocks, an HTTP request block, MQTT over TLS, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 
 ## License
 
