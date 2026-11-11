@@ -159,7 +159,7 @@ EspressOS is young. Two self-reviews found 29 issues across security, controller
 
 The complete editor flow is tested by hand against the mock board and the simulator.
 
-**Runs on real hardware.** EspressOS has been flashed to an ESP32 dev board (ESP32-D0WD-V3, CH340 USB). It booted cleanly, went through the setup page, joined the home Wi-Fi and served the editor. A deployed program then switched the on-board LED (GPIO 2) live from a web switch, analog inputs read a joystick's position, and the board stayed cool. Not yet tried on hardware: sensor drivers, PWM outputs, firmware updates over Wi-Fi, and the fallback network after a router outage. Reports from other boards are very welcome.
+**Runs on real hardware.** EspressOS has been flashed to an ESP32 dev board (ESP32-D0WD-V3, CH340 USB). It booted cleanly, went through the setup page, joined the home Wi-Fi and served the editor. A deployed program then switched the on-board LED (GPIO 2) live from a web switch, analog inputs read a joystick's position, and a PWM output dimmed the LED from both a web setpoint and the joystick. The board stayed cool throughout. Not yet tried on hardware: sensor drivers, firmware updates over Wi-Fi, and the fallback network after a router outage. Reports from other boards are very welcome.
 
 On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 
