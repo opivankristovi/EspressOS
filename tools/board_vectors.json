@@ -19,6 +19,10 @@
       "profile": { "schema": 1, "id": "t-strap", "name": "Strap", "terminals": [{ "label": "IO1", "gpio": 12, "uses": ["di", "do"] }] } },
     { "name": "active-low input on strapping pin is allowed", "ok": true,
       "profile": { "schema": 1, "id": "t-strapin", "name": "Strap in", "terminals": [{ "label": "DI1", "gpio": 14, "uses": ["di"], "active": "low" }] } },
+    { "name": "non-ASCII note of 48 characters (more than 48 bytes)", "ok": true,
+      "profile": { "schema": 1, "id": "t-utf8", "name": "Schaltkasten Gewächshaus Süd – Ω", "terminals": [{ "label": "AI1", "gpio": 36, "uses": ["ai"], "note": "0–10 V / 4–20 mA, 250 Ω shunt, jumper J1–J3 ÄÖÜ!" }] } },
+    { "name": "non-ASCII note of 49 characters", "ok": false,
+      "profile": { "schema": 1, "id": "t-utf8", "name": "X", "terminals": [{ "label": "AI1", "gpio": 36, "uses": ["ai"], "note": "0–10 V / 4–20 mA, 250 Ω shunt, jumper J1–J3 ÄÖÜß!" }] } },
     { "name": "unknown keys are ignored", "ok": true,
       "profile": { "schema": 1, "id": "t-extra", "name": "Extra", "vendor": "x", "terminals": [{ "label": "IO1", "gpio": 23, "uses": ["do"], "color": "red" }] } },
 

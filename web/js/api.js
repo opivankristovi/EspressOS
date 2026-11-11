@@ -194,6 +194,8 @@
     async setBoard(profile) {
       const err = root.Boards.validate(profile);
       if (err) return { ok: false, err };
+      if (!root.Boards.isBare(profile) && profile.id === root.Boards.idOf(this.hal.board))
+        return { ok: false, err: `This board already uses a profile with the id "${profile.id}". A changed profile needs a new id, so programs made for the old wiring do not run on it.` };
       this.engine.stop();
       this.hal.board = root.Boards.isBare(profile) ? root.Boards.BARE : JSON.parse(JSON.stringify(profile));
       try {

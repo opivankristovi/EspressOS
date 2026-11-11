@@ -97,9 +97,10 @@
   const sameProfile = (a, b) => (Boards.isBare(a) || Boards.isBare(b) ? Boards.isBare(a) && Boards.isBare(b) : JSON.stringify(a) === JSON.stringify(b));
   // The profile a program's stamp names, as far as this browser knows it (unknown id: no terminal names).
   function stampedBoard(prog) {
-    if (prog.board === undefined || prog.board === 'bare') return Boards.BARE;
-    if (prog.board === board.id) return board;
-    return [...Boards.PRESETS, ...customBoards].find((x) => x.id === prog.board) || { id: String(prog.board), name: String(prog.board), terminals: [] };
+    const id = Boards.stampOf(prog);
+    if (id === 'bare') return Boards.BARE;
+    if (board && id === board.id) return board;
+    return [...Boards.PRESETS, ...customBoards].find((x) => x.id === id) || { id, name: id, terminals: [] };
   }
   function retargetProgram() {
     const { prog, notes } = Boards.retarget(editor.prog, stampedBoard(editor.prog), board);
@@ -181,16 +182,21 @@
       } else if (q.type === 'text') {
         pane.append(h('label', {}, q.label, h('input', { value: p[q.key] || '', onchange: (e) => { p[q.key] = e.target.value; commit(); } })));
       } else if (q.type === 'bool') {
-        const fixed = q.key === 'inv' ? Boards.fixedInv(board, p.pin) : -1;  // the board's terminal decides
+        // The board's terminal decides Invert. The box shows what the block really holds; it is
+        // locked once that matches the terminal, and left free to fix a block that does not.
+        const fixed = q.key === 'inv' && (b.type === 'DI' || b.type === 'DO') ? Boards.fixedInv(board, p.pin) : -1;
+        const val = Number(p[q.key]) ? 1 : 0, wrong = fixed >= 0 && val !== fixed;
         pane.append(h('label', { class: 'inline', title: fixed >= 0 ? 'Set by the board: this terminal is active-' + (fixed ? 'low' : 'high') : null },
-          h('input', { type: 'checkbox', checked: fixed >= 0 ? !!fixed : !!Number(p[q.key]), disabled: fixed >= 0, onchange: (e) => { p[q.key] = e.target.checked ? 1 : 0; commit(); } }),
-          q.label + (fixed >= 0 ? ' (set by the board)' : '')));
+          h('input', { type: 'checkbox', checked: !!val, disabled: fixed >= 0 && !wrong, onchange: (e) => { p[q.key] = e.target.checked ? 1 : 0; commit(); renderProps(editor.block(b.id)); } }),
+          q.label + (fixed < 0 ? '' : wrong ? ` (must be ${fixed ? 'on' : 'off'}: this terminal is active-${fixed ? 'low' : 'high'})` : ' (set by the board)')));
       } else if (q.type === 'pin' && !bare()) {
         pane.append(h('label', {}, 'Terminal', terminalSelect(q.use, p, () => { terminalDefaults(b.type, p); commit(); renderProps(editor.block(b.id)); })));
         const clash = pinClash(b);
         if (clash) pane.append(h('p', { class: 'help', style: 'color:var(--warn)' }, clash));
       } else if (q.type === 'select' || q.type === 'pin') {
         const sel = h('select', { onchange: (e) => { const o = q.options.find((x) => String(x[0]) === e.target.value); p[q.key] = o ? o[0] : e.target.value; commit(); } },
+          // A pin cleared by Retarget (or a board change) shows as unset, not as the first GPIO.
+          q.type === 'pin' && !hasPin(p) ? h('option', { value: '', selected: true, disabled: true }, '– pick a pin –') : null,
           q.options.map(([v, l]) => h('option', { value: v, selected: String(v) === String(p[q.key]) }, l)));
         pane.append(h('label', {}, q.label, sel));
         if (q.key === 'pin') {
@@ -321,9 +327,10 @@
     }
     // Board stamp: a program made for another board must be retargeted (the board refuses it otherwise).
     const act = { label: 'Retarget to ' + board.name, fn: retargetProgram };
-    if (prog.board !== undefined && String(prog.board) !== Boards.idOf(board))
-      out.unshift({ lvl: 'err', msg: `This program was made for board "${prog.board}", but the board is set to ${board.name}.`, act });
-    else if (prog.board === undefined && !bare() && out.some((i) => i.pin))
+    const stamp = Boards.stampOf(prog);
+    if (stamp !== 'bare' && stamp !== Boards.idOf(board))
+      out.unshift({ lvl: 'err', msg: `This program was made for board "${stamp}", but the board is set to ${board.name}.`, act });
+    else if (stamp === 'bare' && !bare() && out.some((i) => i.pin))
       out.unshift({ lvl: 'warn', msg: `This program was made for a bare ESP32. Retarget it to map its pins onto the terminals of ${board.name}.`, act });
     return out;
   }
@@ -780,13 +787,14 @@
   // ------------------------------------------------------------ board profile (Settings → Board)
   // Profiles may come from files: everything here is rendered as text nodes, never as HTML.
   let boardPick = null;  // profile shown in the card (not applied yet)
+  let boardLocked = false;  // the board's stored profile is unreadable: nothing is active, every choice can be applied
   function loadCustomBoards() {
     try { customBoards = (JSON.parse(store.get('eos.boards.custom') || '[]') || []).filter((x) => !Boards.validate(x) && !Boards.isBare(x)); } catch { customBoards = []; }
   }
   function boardChoices() {
     const list = Boards.PRESETS.map((x) => ({ prof: x, custom: false }));
     for (const x of customBoards) if (!list.some((c) => sameProfile(c.prof, x))) list.push({ prof: x, custom: true });
-    if (!list.some((c) => sameProfile(c.prof, board))) list.push({ prof: board, custom: true });  // set on the board from elsewhere
+    if (!boardLocked && !list.some((c) => sameProfile(c.prof, board))) list.push({ prof: board, custom: true });  // set on the board from elsewhere
     return list;
   }
   function renderBoardCard() {
@@ -795,14 +803,15 @@
     if (!boardPick || !list.some((c) => sameProfile(c.prof, boardPick))) boardPick = board;
     sel.textContent = '';
     list.forEach((c, i) => sel.append(h('option', { value: i, selected: sameProfile(c.prof, boardPick) },
-      c.prof.name + (c.prof.rev ? ' rev ' + c.prof.rev : '') + (c.custom ? ' (custom)' : '') + (sameProfile(c.prof, board) ? ' – active' : ''))));
+      c.prof.name + (c.prof.rev ? ' rev ' + c.prof.rev : '') + (c.custom ? ' (custom)' : '') + (isActive(c.prof) ? ' – active' : ''))));
     sel.onchange = () => { boardPick = list[Number(sel.value)].prof; renderBoardView(); };
     renderBoardView();
   }
+  const isActive = (p) => !boardLocked && sameProfile(p, board);
   function renderBoardView() {
     const box = $('#boardView'), p = boardPick;
     box.textContent = '';
-    $('#btnBoardApply').disabled = sameProfile(p, board);
+    $('#btnBoardApply').disabled = isActive(p);
     if (Boards.isBare(p)) {
       box.append(h('p', { class: 'muted small' }, 'Any usable GPIO, as on an ESP32 dev board. I²C pins come from the Network settings, DS18B20 sensors can use any output-capable pin.'));
       return;
@@ -817,16 +826,37 @@
   }
   async function applyBoard() {
     const p = boardPick;
-    if (sameProfile(p, board)) return;
+    if (isActive(p)) return;
+    // Programs are tied to a board by id: a changed profile under the active id would let the old program run on it.
+    if (!boardLocked && !Boards.isBare(p) && p.id === Boards.idOf(board))
+      return toast(`The board already uses a profile with the id "${p.id}". Give the changed profile its own id (in its JSON file), then import it again.`, true);
     const ans = await choose('Use ' + p.name + '?', 'The board restarts with this profile. The program stays stopped until you deploy it again.',
       [['go', 'Apply', 'primary'], ['cancel', 'Cancel']]);
     if (ans !== 'go') return;
     const r = await be.setBoard(Boards.isBare(p) ? { id: 'bare' } : p).catch((x) => ({ ok: false, err: x.message }));
     if (!r || !r.ok) return toast('Not applied: ' + ((r && r.err) || 'no answer'), true);
     board = Boards.isBare(p) ? Boards.BARE : p;
+    boardLocked = false;
+    // Until the board answers again, show the I2C pins as the new profile sets them, so a
+    // Network save in the meantime cannot send the old pins.
+    i2cFixed = !Boards.isBare(p);
+    const f = $('#formWifi'), bus = Boards.i2cOf(p);
+    f.sda.readOnly = f.scl.readOnly = i2cFixed;
+    if (bus) { f.sda.value = bus.sda; f.scl.value = bus.scl; }
+    $('#i2cRow').hidden = i2cFixed && !bus;
+    $('#i2cNote').textContent = !i2cFixed ? '' : bus ? 'The I²C pins are fixed by the board profile.' : 'This board has no I²C bus.';
     boardChanged();
-    toast(be.kind === 'sim' ? 'Board profile set. Deploy the program to run it on this board.' : 'Board profile saved. The board restarts…');
-    setTimeout(loadSettings, be.kind === 'sim' ? 0 : 6000);
+    showBoardError('');
+    if (be.kind === 'sim') { toast('Board profile set. Deploy the program to run it on this board.'); loadSettings(); return; }
+    toast('Board profile saved. The board restarts…');
+    // A restart plus Wi-Fi reconnect can take a while: wait until the board answers, then reload.
+    for (let i = 0; i < 30; i++) {
+      await new Promise((ok) => setTimeout(ok, i ? 3000 : 6000));
+      try { await be.getConfig(); break; } catch { /* still restarting */ }
+    }
+    await loadBoard();
+    boardChanged();
+    loadSettings();
   }
   // Everything that shows pins depends on the board.
   function boardChanged() {
@@ -840,7 +870,8 @@
   async function loadBoard() {
     let r = null;
     try { r = await be.getBoard(); } catch { /* older firmware: no profiles */ }
-    if (r && r.id === '?') { board = Boards.BARE; return; }  // locked; refreshInfo shows boardError
+    boardLocked = !!(r && r.id === '?');
+    if (boardLocked) { board = Boards.BARE; return; }  // refreshInfo shows boardError
     const bad = r && typeof r.id === 'string' ? Boards.validate(r) : 'no profile';
     if (bad && r && r.id) console.warn('Board profile from the board not understood:', bad);
     board = !bad && !Boards.isBare(r) ? r : Boards.BARE;
@@ -860,6 +891,11 @@
       const err = Boards.validate(p);
       if (err) return toast('Not a usable board profile: ' + err, true);
       if (!Boards.isBare(p)) {
+        // An id names one wiring: a different profile under a built-in or the active id would be mistaken for it.
+        const preset = Boards.PRESETS.find((x) => x.id === p.id);
+        if (preset && !sameProfile(preset, p)) return toast(`This profile uses the id "${p.id}" of the built-in ${preset.name} but has different terminals. Give it its own id.`, true);
+        if (!boardLocked && p.id === Boards.idOf(board) && !sameProfile(board, p))
+          return toast(`The board already uses a profile with the id "${p.id}" and this one is different. Give it its own id.`, true);
         customBoards = customBoards.filter((x) => x.id !== p.id).concat([p]);
         store.set('eos.boards.custom', JSON.stringify(customBoards));
       }

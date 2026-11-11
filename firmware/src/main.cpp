@@ -201,26 +201,29 @@ static int i2cScl() { return boardError.length() ? -1 : board.bare() ? cfg.scl :
 
 // ------------------------------------------------------------------ board profile
 // Read at boot only: pins and the I2C bus are set up once. An unreadable profile
-// never falls back to bare (a program for other wiring could drive the wrong
-// pins): the board stays locked until a profile is chosen again.
+// never falls back to bare or to the backup (a program for other wiring could
+// drive the wrong pins): the board stays locked until a profile is chosen again.
+// The .bak that writeFile leaves is the profile from BEFORE the last change,
+// usually another board, so it is never used as the working profile.
+static const char* const kBoardSuffixes[] = {"", ".bak", ".tmp"};
 static void loadBoard() {
   board.setBare();
   boardError = "";
-  if (!fileOrBackupExists(kBoardFile)) return;
-  std::string err, errBak;
-  String text = readFile(kBoardFile), bak = readFile((String(kBoardFile) + ".bak").c_str());
+  bool any = false;
+  for (const char* s : kBoardSuffixes) any |= LittleFS.exists(String(kBoardFile) + s);
+  if (!any) return;  // never set: bare
+  std::string err;
+  String text = readFile(kBoardFile);
   if (text.length() && board.parse(text.c_str(), err, EspHal::chipRules())) return;
-  if (bak.length() && board.parse(bak.c_str(), errBak, EspHal::chipRules())) {
-    Serial.printf("%s damaged, using its backup\n", kBoardFile);
-    return;
-  }
-  if (err.empty()) err = errBak.empty() ? "file is empty" : errBak;
+  board.setBare();
+  if (!LittleFS.exists(kBoardFile)) err = "the last change was interrupted (power cut?)";
+  else if (text.isEmpty()) err = "file is empty";
   boardError = String("Board profile is unreadable: ") + err.c_str() + ". Choose the board again in Settings \xE2\x86\x92 Board.";
   Serial.println(boardError);
 }
 
 static bool removeBoardFiles() {
-  for (const char* suffix : {"", ".bak", ".tmp"}) {
+  for (const char* suffix : kBoardSuffixes) {
     String f = String(kBoardFile) + suffix;
     if (LittleFS.exists(f) && !LittleFS.remove(f)) return false;
   }
@@ -603,7 +606,9 @@ struct Ota {
   bool wasRunning = false;
   bool ok = false;
   AsyncWebServerRequest* req = nullptr;
-  String keepProgram, keepConfig, keepRunFlag, keepBoard;
+  String keepProgram, keepConfig, keepRunFlag;
+  String keepBoard[3];  // /board.json, .bak, .tmp exactly as they were (see loadBoard)
+  bool hadBoard[3] = {};
   String err;  // why the last upload was refused
 };
 static Ota ota;
@@ -615,8 +620,16 @@ static void otaFinish(bool ok) {
     if (ota.keepConfig.length()) writeFile(kConfigFile, ota.keepConfig.c_str(), ota.keepConfig.length());
     if (ota.keepProgram.length()) writeFile(kProgramFile, ota.keepProgram.c_str(), ota.keepProgram.length());
     if (ota.keepRunFlag.length()) writeFile(kRunFlagFile, ota.keepRunFlag.c_str(), ota.keepRunFlag.length());
-    if (ota.keepBoard.length()) writeFile(kBoardFile, ota.keepBoard.c_str(), ota.keepBoard.length());
-    ota.keepProgram = ota.keepConfig = ota.keepRunFlag = ota.keepBoard = String();
+    // The board files go back byte for byte, damaged or not, so the board boots
+    // exactly as it would have without the update (locked stays locked).
+    for (int i = 0; i < 3; i++) {
+      if (!ota.hadBoard[i]) continue;
+      File f = LittleFS.open(String(kBoardFile) + kBoardSuffixes[i], "w");
+      if (f) { f.print(ota.keepBoard[i]); f.close(); }
+      ota.keepBoard[i] = String();
+      ota.hadBoard[i] = false;
+    }
+    ota.keepProgram = ota.keepConfig = ota.keepRunFlag = String();
   }
   // A failed update, or a web-UI-only update, resumes the program.
   if (ota.wasRunning && (!ok || ota.fs)) engineSetRunning(true);
@@ -649,9 +662,12 @@ static void otaUpload(AsyncWebServerRequest* r, const String&, size_t index, uin
       ota.keepProgram = readFile(kProgramFile);
       ota.keepConfig = readFile(kConfigFile);
       ota.keepRunFlag = readFile(kRunFlagFile);
-      // Kept byte for byte, even if damaged: losing it would turn the board bare silently.
-      ota.keepBoard = readFile(kBoardFile);
-      if (ota.keepBoard.isEmpty()) ota.keepBoard = readFile((String(kBoardFile) + ".bak").c_str());
+      // Kept byte for byte, even if damaged: losing them would turn the board bare silently.
+      for (int i = 0; i < 3; i++) {
+        String f = String(kBoardFile) + kBoardSuffixes[i];
+        ota.hadBoard[i] = LittleFS.exists(f);
+        ota.keepBoard[i] = ota.hadBoard[i] ? readFile(f.c_str()) : String();
+      }
       LittleFS.end();
     }
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, ota.fs ? U_SPIFFS : U_FLASH)) {
@@ -866,7 +882,7 @@ static void setupRoutes() {
       serializeJson(d, s);
       return sendJson(r, 200, s);
     }
-    String s = board.bare() ? String() : readJsonFile(kBoardFile);
+    String s = board.bare() ? String() : readFile(kBoardFile);  // the file loadBoard parsed (never the .bak)
     sendJson(r, 200, s.length() ? s : String("{\"schema\":1,\"id\":\"bare\",\"name\":\"") + board.name() + "\"}");
   });
 
@@ -881,6 +897,11 @@ static void setupRoutes() {
         eos::BoardProfile next;
         std::string perr;
         if (!next.parse(b, perr, EspHal::chipRules())) return sendResult(r, false, perr.c_str());
+        // Programs are tied to a board by its id. A changed profile under the same id
+        // would let the stored program start again on different wiring.
+        if (!boardError.length() && !next.bare() && strcmp(next.id(), board.id()) == 0)
+          return sendResult(r, false, (String("This board already uses a profile with the id \"") + board.id() +
+                                       "\". A changed profile needs a new id, so programs made for the old wiring do not run on it.").c_str());
         bool wasRunning = engineRunning();
         engineSetRunning(false);  // outputs to their safe state before the wiring changes
         bool saved = next.bare() ? removeBoardFiles() : writeFile(kBoardFile, b, strlen(b));

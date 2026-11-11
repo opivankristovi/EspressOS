@@ -29,6 +29,7 @@ class MockHal extends NullHal {
     return { ok: true, v: base[ch] + Math.sin(Date.now() / 7000 + ch) * 3 };
   }
   timeOfDay() { const d = new Date(); return { dow: d.getDay(), m: d.getHours() * 60 + d.getMinutes() }; }
+  get i2c() { return i2cCfg; }  // bare-board I2C pins from Settings, for Engine.load's bus check
 }
 const engine = new Engine(new MockHal());
 engine.hal.board = Boards.BARE;  // checked by engine.load like the firmware's deploy()
@@ -59,6 +60,8 @@ const routes = {
     let p; try { p = JSON.parse(b); } catch (e) { return { status: 400, body: { ok: false, err: 'JSON: ' + e.message } }; }
     const err = Boards.validate(p);
     if (err) return { status: 400, body: { ok: false, err } };
+    if (!Boards.isBare(p) && p.id === Boards.idOf(engine.hal.board))
+      return { status: 400, body: { ok: false, err: `This board already uses a profile with the id "${p.id}". A changed profile needs a new id, so programs made for the old wiring do not run on it.` } };
     engine.stop();  // the real board reboots; the stored program then waits for a deploy stamped for this board
     engine.hal.board = Boards.isBare(p) ? Boards.BARE : p;
     return { ok: true };
@@ -92,7 +95,7 @@ const routes = {
     if (d.adminPass !== undefined && String(d.adminPass).length < 8) return { status: 400, body: { ok: false, err: 'Admin password needs at least 8 characters' } };
     if (!bare() && (d.sda !== undefined || d.scl !== undefined)) {
       const now = i2cNow();
-      if (d.sda !== now.sda || d.scl !== now.scl) return { status: 400, body: { ok: false, err: 'The I2C pins are fixed by the board profile' } };
+      if ((d.sda !== undefined && d.sda !== now.sda) || (d.scl !== undefined && d.scl !== now.scl)) return { status: 400, body: { ok: false, err: 'The I2C pins are fixed by the board profile' } };
     } else if (!validI2c(d.sda ?? i2cCfg.sda, d.scl ?? i2cCfg.scl)) return { status: 400, body: { ok: false, err: 'I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)' } };
     if (d.mqtt) {
       const m = { ...mqtt, ...d.mqtt };

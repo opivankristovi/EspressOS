@@ -39,10 +39,12 @@
       ] },
   ];
 
-  // Byte lengths, as the firmware measures them (strlen / serialized size).
+  // The size limit is in bytes (serialized JSON); text limits are in characters,
+  // as the firmware counts them (utf8Len in Board.cpp counts code points).
   const bytes = (s) => new TextEncoder().encode(s).length;
+  const chars = (s) => [...s].length;
   const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
-  const str = (x, min, max) => typeof x === 'string' && bytes(x) >= min && bytes(x) <= max;
+  const str = (x, min, max) => typeof x === 'string' && chars(x) >= min && chars(x) <= max;
   const given = (x) => x !== undefined && x !== null;  // JSON null counts as absent (ArduinoJson isNull)
 
   // null when the profile is usable, else the reason. Never trims or repairs a profile.
@@ -114,6 +116,8 @@
 
   const isBare = (p) => !p || p.id === 'bare';
   const idOf = (p) => (isBare(p) ? 'bare' : p.id);
+  // The board a program was made for. Like the firmware: anything but a string (absent, null, a number) = bare.
+  const stampOf = (prog) => (prog && typeof prog.board === 'string' ? prog.board : 'bare');
   const CHIP = { di: () => Cat.IN_PINS, do: () => Cat.OUT_PINS, ai: () => Cat.ADC_PINS, pwm: () => Cat.OUT_PINS };
 
   function pinsFor(p, use) {
@@ -170,10 +174,25 @@
         if (pin !== had) notes.push(`B${b.id}: ${was} → ${labelOf(to, pin)} (GPIO ${pin}).`);
       }
       if (pin !== null && (b.type === 'DI' || b.type === 'DO')) {
-        const fi = fixedInv(to, pin);
-        if (fi >= 0 && (Number(b.p.inv) ? 1 : 0) !== fi) { b.p.inv = fi; notes.push(`B${b.id}: Invert ${fi ? 'on' : 'off'}, ${labelOf(to, pin)} is active-${fi ? 'low' : 'high'}.`); }
-        const tt = terminalOf(to, pin);
-        if (b.type === 'DI' && tt && typeof tt.pull === 'boolean' && (Number(b.p.pull) ? 1 : 0) !== (tt.pull ? 1 : 0)) { b.p.pull = tt.pull ? 1 : 0; notes.push(`B${b.id}: internal pull-up ${tt.pull ? 'on' : 'off'} for ${tt.label}.`); }
+        const fi = fixedInv(to, pin), tt = terminalOf(to, pin), name = labelOf(to, pin);
+        const inv = Number(b.p.inv) ? 1 : 0;
+        if (fi >= 0) {
+          if (inv !== fi) { b.p.inv = fi; notes.push(`B${b.id}: Invert ${fi ? 'on' : 'off'}, ${name} is active-${fi ? 'low' : 'high'}.`); }
+        } else if (ft && given(ft.active) && inv) {
+          // The old board forced Invert (an opto input or active-low relay); the new terminal does not.
+          b.p.inv = 0;
+          notes.push(`B${b.id}: Invert was set by ${ft.label} on ${from.name || idOf(from)}; it is now off on ${name}. Check it matches your wiring.`);
+        }
+        if (b.type === 'DI') {
+          const pull = Number(b.p.pull) ? 1 : 0;
+          if (tt && typeof tt.pull === 'boolean') {
+            if (pull !== (tt.pull ? 1 : 0)) { b.p.pull = tt.pull ? 1 : 0; notes.push(`B${b.id}: internal pull-up ${tt.pull ? 'on' : 'off'} for ${tt.label}.`); }
+          } else if (ft && typeof ft.pull === 'boolean' && !pull && Cat.OUT_PINS.includes(pin)) {
+            // Back to the DI default (pull-up on); input-only pins 34-39 have no internal pull.
+            b.p.pull = 1;
+            notes.push(`B${b.id}: internal pull-up was turned off by ${ft.label} on ${from.name || idOf(from)}; it is on again for ${name}. Check it matches your wiring.`);
+          }
+        }
       }
     }
     const ow = oneWirePins(to);
@@ -187,7 +206,7 @@
     return { prog, notes };
   }
 
-  const api = { PRESETS, BARE, USES, USE_NAME, BOOT_PINS, validate, isBare, idOf, pinsFor, terminalOf, labelOf, fixedInv,
+  const api = { PRESETS, BARE, USES, USE_NAME, BOOT_PINS, validate, isBare, idOf, stampOf, pinsFor, terminalOf, labelOf, fixedInv,
     oneWirePins, i2cOf, hasI2c, busOf, pinProblem, retarget };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Boards = api;

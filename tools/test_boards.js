@@ -147,3 +147,38 @@ test('retarget to and from bare', () => {
   assert.equal(toBare.prog.blocks[1].p.pin, 17);
   assert.equal(boardEngine(B.BARE).load({ ...toBare.prog, blocks: [toBare.prog.blocks[1]] }), null);
 });
+
+test('retarget drops an Invert or pull-up that only the old board forced', () => {
+  // MB-2 DI5 (GPIO 13) is an active-low opto: inv 1, pull 0. On MB-1, GPIO 13 is the plain IO5.
+  const { prog, notes } = B.retarget({ board: 'eos-mb2', blocks: [{ id: 1, type: 'DI', p: { pin: 13, inv: 1, pull: 0 } }], wires: [] }, mb2, mb1);
+  assert.deepEqual(prog.blocks[0].p, { pin: 13, inv: 0, pull: 1 });
+  assert.ok(notes.some((n) => /B1: Invert was set by DI5/.test(n)), notes.join('\n'));
+  assert.ok(notes.some((n) => /B1: internal pull-up was turned off by DI5/.test(n)), notes.join('\n'));
+  // Input-only pins have no internal pull-up, so it stays off there (MB-2 DI1 = GPIO 36 -> bare).
+  const toBare = B.retarget({ board: 'eos-mb2', blocks: [{ id: 1, type: 'DI', p: { pin: 36, inv: 1, pull: 0 } }], wires: [] }, mb2, B.BARE);
+  assert.deepEqual(toBare.prog.blocks[0].p, { pin: 36, inv: 0, pull: 0 });
+  // An Invert the user chose on a plain terminal is left alone.
+  const own = B.retarget({ board: 'eos-mb1', blocks: [{ id: 1, type: 'DO', p: { pin: 23, inv: 1 } }], wires: [] }, mb1, B.BARE);
+  assert.equal(own.prog.blocks[0].p.inv, 1);
+});
+
+test('a stamp that is not a string means bare, as in the firmware', () => {
+  for (const board of [undefined, null, 0, 7, true]) assert.equal(B.stampOf({ board }), 'bare');
+  assert.equal(B.stampOf({ board: 'eos-mb1' }), 'eos-mb1');
+  assert.equal(boardEngine(B.BARE).load({ board: null, blocks: [{ id: 1, type: 'DO', p: { pin: 2 } }], wires: [] }), null);
+  assert.match(boardEngine(mb1).load(relayProg({ board: null })), /made for board "bare"/);
+});
+
+test('text limits count characters, not bytes', () => {
+  const note = 'ä'.repeat(48);
+  const p = { schema: 1, id: 't-x', name: 'Ü'.repeat(40), terminals: [{ label: 'IO1', gpio: 23, uses: ['do'], note }] };
+  assert.equal(B.validate(p), null);
+  assert.match(B.validate({ ...p, name: 'Ü'.repeat(41) }), /name/);
+});
+
+test('bare board: sensors keep their pins to themselves, as deploy() checks', () => {
+  const bme = { id: 1, driver: 'BME280', addr: 0x76 };
+  assert.match(boardEngine(B.BARE).load({ blocks: [{ id: 1, type: 'DI', p: { pin: 21 } }], wires: [], devices: [bme] }), /GPIO 21 is the I2C bus/);
+  assert.equal(boardEngine(B.BARE).load({ blocks: [{ id: 1, type: 'DI', p: { pin: 21 } }], wires: [] }), null);  // no I2C sensor: free pin
+  assert.match(boardEngine(B.BARE).load({ blocks: [], wires: [], devices: [{ id: 1, driver: 'DS18B20', pin: 34 }] }), /output-capable/);
+});

@@ -162,13 +162,19 @@
 
   // Sensor bus checks of the firmware's deploy(): a 1-Wire pin never doubles as block I/O,
   // and with a board profile the buses are the board's.
-  function deviceProblem(d, board, pinOwner) {
+  function deviceProblem(d, board, pinOwner, i2c) {
     const name = 'Sensor ' + (d.name || d.driver) + ': ';
     if (d.driver === 'DS18B20') {
       const pin = Number(d.pin);
+      if (!Cat.OUT_PINS.includes(pin)) return 'DS18B20 needs an output-capable data pin (not 6-11 or 34-39)';
       if (pinOwner.has(pin)) return name + 'GPIO ' + pin + ' is also used by block ' + pinOwner.get(pin).id;
       if (board && !Boards.isBare(board) && !Boards.oneWirePins(board).includes(pin)) return name + 'GPIO ' + pin + ' is not a 1-Wire terminal on this board';
     } else if (board && !Boards.hasI2c(board)) return name + 'this board has no I2C bus';
+    else if (board && Boards.isBare(board)) {
+      // Bare board: while an I2C sensor is in the program, SDA/SCL (from Settings) are not block I/O.
+      for (const pin of [i2c.sda, i2c.scl]) if (pinOwner.has(pin))
+        return 'Block ' + pinOwner.get(pin).id + ': GPIO ' + pin + ' is the I2C bus (SDA ' + i2c.sda + ', SCL ' + i2c.scl + ')';
+    }
     return null;
   }
 
@@ -203,7 +209,7 @@
       const blocks = [], byId = new Map(), pinOwner = new Map(), mqtt = {}; let nSig = 0;
       const board = this.hal.board;  // undefined = no board checks at all (tests, file import)
       if (board) {
-        const stamp = prog.board === undefined ? 'bare' : String(prog.board), id = Boards.idOf(board);
+        const stamp = Boards.stampOf(prog), id = Boards.idOf(board);
         if (stamp !== id) return 'Program was made for board "' + stamp + '" but this board is set to "' + id + '". Open it in the editor and use Retarget, then Deploy.';
       }
       for (const o of prog.blocks || []) {
@@ -237,7 +243,7 @@
         byId.set(o.id, blocks.length); blocks.push(b);
       }
       for (const d of prog.devices || []) {
-        const why = deviceProblem(d, board, pinOwner);
+        const why = deviceProblem(d, board, pinOwner, this.hal.i2c || { sda: 21, scl: 22 });
         if (why) return why;
       }
       const edges = blocks.map(() => []), indeg = blocks.map(() => 0);
