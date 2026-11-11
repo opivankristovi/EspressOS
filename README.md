@@ -157,7 +157,9 @@ EspressOS is young. Two self-reviews found 29 issues across security, controller
 - OpenPLC: the exports compile with `matiec` and behave the same as in EspressOS.
 - The firmware build: 1.57 MB of the 1.9 MB app slot.
 
-The complete editor flow is tested by hand against the mock board and the simulator. **It has not run on a real ESP32 yet**, so the Wi-Fi setup portal, OTA and sensor drivers are compiled but not tested on hardware. Reports from the first brave flashers are very welcome.
+The complete editor flow is tested by hand against the mock board and the simulator.
+
+**Runs on real hardware.** EspressOS has been flashed to an ESP32 dev board (ESP32-D0WD-V3, CH340 USB). It booted cleanly, went through the setup page, joined the home Wi-Fi and served the editor. A deployed program then switched the on-board LED (GPIO 2) live from a web switch, and the board stayed cool. Not yet tried on hardware: sensor drivers, analog inputs and PWM outputs, firmware updates over Wi-Fi, and the fallback network after a router outage. Reports from other boards are very welcome.
 
 On the roadmap: Modbus RTU and UART blocks, an MQTT/HTTP output block, CI-built `.bin` releases you can flash from the browser, and retentive (power-fail-safe) counters.
 
