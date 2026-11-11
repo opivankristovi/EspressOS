@@ -27,6 +27,7 @@
 </header>
 
 <div id="banner" class="banner" hidden></div>
+<div id="boardBanner" class="banner err" hidden></div>
 
 <main>
   <!-- ======================= PROGRAM EDITOR ======================= -->
@@ -97,7 +98,8 @@
           <label>Hostname<input name="host" placeholder="espressos"></label>
           <label>Admin password for this page<input name="adminPass" type="password" placeholder="unchanged" autocomplete="new-password"></label>
           <label>Time zone (POSIX)<input name="tz"></label>
-          <div class="row"><label>I²C SDA<input name="sda" type="number"></label><label>I²C SCL<input name="scl" type="number"></label></div>
+          <div class="row" id="i2cRow"><label>I²C SDA<input name="sda" type="number"></label><label>I²C SCL<input name="scl" type="number"></label></div>
+          <p class="muted small" id="i2cNote"></p>
           <p class="muted small">Network and I²C changes take effect after a reboot; a new admin password right away.</p>
           <p class="small" id="apKeyInfo" hidden>If the board cannot reach your Wi-Fi for 2 minutes, it opens its own <b>EspressOS-…</b> network so you can still get in. Its password: <code id="apKey"></code></p>
           <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="btnReboot">Reboot board</button></div>
@@ -114,6 +116,17 @@
           <p class="small">Status: <b id="mqttStatus">–</b></p>
           <div class="row"><button class="btn primary" type="submit">Save</button></div>
         </form>
+        <div class="card" id="boardCard">
+          <h3>Board</h3>
+          <p class="muted small">The carrier board the ESP32 sits on. Its profile names the terminals and allows each one only for what the board wires it for.</p>
+          <label>Board profile<select id="boardSel"></select></label>
+          <div id="boardView"></div>
+          <div class="row">
+            <label class="btn">Import JSON…<input type="file" id="fileBoard" accept=".json,application/json" hidden></label>
+            <button class="btn" type="button" id="btnBoardExport">Export JSON</button>
+            <button class="btn primary" type="button" id="btnBoardApply">Apply</button>
+          </div>
+        </div>
         <div class="card">
           <h3>Program</h3>
           <label>Scan cycle<select id="cycleMs"><option value="5">5 ms</option><option value="10">10 ms</option><option value="20">20 ms</option><option value="50">50 ms</option><option value="100">100 ms</option></select></label>
@@ -138,6 +151,7 @@
 <div id="toast" class="toast" hidden></div>
 
 <script src="js/catalog.js"></script>
+<script src="js/boards.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/plcopen.js"></script>
 <script src="js/api.js"></script>

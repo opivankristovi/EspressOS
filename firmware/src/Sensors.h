@@ -1,6 +1,8 @@
 #pragma once
 #include <ArduinoJson.h>
 
+#include "Board.h"
+
 // Sensor device manager. Devices are declared in the program JSON:
 //   "devices":[{"id":1,"driver":"BME280","addr":118,"poll":2}]
 // A background task polls each device and caches its channel values; the
@@ -10,7 +12,9 @@ namespace Sensors {
 constexpr int kMaxDevices = 12;
 constexpr int kMaxChannels = 4;
 
-void begin(int sda, int scl);
+// sda < 0: the board has no I2C bus (it is not started; I2C devices are refused).
+// board: the active profile (DS18B20 pins must be in its onewire list).
+void begin(int sda, int scl, const eos::BoardProfile* board);
 // Checks drivers/limits without touching running devices.
 bool validate(JsonArrayConst devices, String& err);
 // True if any device talks over the I2C bus (everything except 1-Wire).

@@ -239,6 +239,15 @@ test('import keeps pins and web slots from the file only when they are usable', 
   assert.ok(r.warnings.some((w) => /GPIO 7 from the file cannot be used/.test(w)));
 });
 
+test('import under a board profile leaves I/O blocks without a pin', () => {
+  const r = P.importPLCopen(exp(allBlocks).xml, { noPins: true });
+  const io = r.prog.blocks.filter((b) => ['DI', 'DO', 'AI', 'AO'].includes(b.type));
+  assert.ok(io.length >= 4);
+  for (const b of io) assert.equal(b.p.pin, undefined, 'B' + b.id);
+  assert.ok(r.warnings.some((w) => /pick a terminal/.test(w)));
+  assert.ok(!r.warnings.some((w) => /was given GPIO/.test(w)));
+});
+
 test('weekly timers stay off in IEC until the clock is marked valid', () => {
   const r = exp(allBlocks);
   assert.ok(r.xml.includes('<variable name="CLOCK_VALID">'));

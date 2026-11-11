@@ -172,7 +172,8 @@ struct Slot {
 Slot slots[kMaxDevices];
 int nSlots = 0;
 SemaphoreHandle_t lock;  // guards slots[] and the I2C bus
-int gSda = 21, gScl = 22;
+int gSda = 21, gScl = 22;  // gSda < 0: no I2C bus on this board
+const eos::BoardProfile* gBoard = nullptr;
 
 void pollTask(void*) {
   for (;;) {
@@ -201,12 +202,16 @@ void pollTask(void*) {
 
 }  // namespace
 
-void begin(int sda, int scl) {
+void begin(int sda, int scl, const eos::BoardProfile* board) {
   gSda = sda;
   gScl = scl;
-  Wire.begin(sda, scl);
-  Wire.setClock(100000);
-  Wire.setTimeOut(20);  // ms; bounds every transfer if a device holds the bus
+  gBoard = board;
+  // A board without an I2C bus may use those pins for anything: never drive them.
+  if (sda >= 0 && scl >= 0) {
+    Wire.begin(sda, scl);
+    Wire.setClock(100000);
+    Wire.setTimeOut(20);  // ms; bounds every transfer if a device holds the bus
+  }
   lock = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(pollTask, "sensors", 6144, nullptr, 1, nullptr, 0);
 }
@@ -224,10 +229,17 @@ bool validate(JsonArrayConst devices, String& err) {
     bool found = false;
     for (const auto& e : kDrivers) if (strcmp(e.id, drv) == 0) found = true;
     if (!found) { err = String("Driver '") + drv + "' is not built into this firmware"; return false; }
-    if (strcmp(drv, "DS18B20") == 0 && !EspHal::outputCapable(d["pin"] | -1)) {
+    bool oneWire = strcmp(drv, "DS18B20") == 0;
+    int pin = d["pin"] | -1;
+    if (oneWire && !EspHal::outputCapable(pin)) {
       err = "DS18B20 needs an output-capable data pin (not 6-11 or 34-39)";
       return false;
     }
+    if (oneWire && gBoard && !gBoard->oneWireOk(pin)) {
+      err = "DS18B20: GPIO " + String(pin) + " is not a 1-Wire terminal on this board";
+      return false;
+    }
+    if (!oneWire && gSda < 0) { err = String(drv) + ": this board has no I2C bus"; return false; }
     int addr = d["addr"] | 0;
     if (addr < 0 || addr > 127) { err = "I2C address must be 0x00-0x7F"; return false; }
   }
@@ -303,6 +315,7 @@ String driversJson() {
 }
 
 String i2cScanJson() {
+  if (gSda < 0) return "{\"sda\":-1,\"scl\":-1,\"found\":[],\"error\":\"This board has no I2C bus.\"}";
   String s = "{\"sda\":" + String(gSda) + ",\"scl\":" + String(gScl) + ",\"found\":[";
   xSemaphoreTake(lock, portMAX_DELAY);
   bool first = true, stuck = false;

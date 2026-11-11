@@ -43,13 +43,15 @@
 
   const ms = (s) => (s <= 0 ? 0 : Math.round(s * 1000));
 
-  // Same pin rules as EspHal::pinProblem (lists live in catalog.js).
-  const Cat = typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.Catalog;
-  const PIN_USE = { DI: 'in', DO: 'out', AI: 'adc', AO: 'out' };
-  function pinProblem(pin, use) {
+  // Same pin rules as EspHal::pinProblem (lists live in catalog.js, board profiles in boards.js).
+  const node = typeof module !== 'undefined' && module.exports;
+  const Cat = node ? require('./catalog.js') : root.Catalog;
+  const Boards = node ? require('./boards.js') : root.Boards;
+  const PIN_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  function chipProblem(pin, use) {
     if (!Cat.IN_PINS.includes(pin)) return 'cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)';
-    if (use === 'out' && !Cat.OUT_PINS.includes(pin)) return 'is input-only';
-    if (use === 'adc' && !Cat.ADC_PINS.includes(pin)) return 'has no usable ADC (use 32-36 or 39)';
+    if ((use === 'do' || use === 'pwm') && !Cat.OUT_PINS.includes(pin)) return 'is input-only';
+    if (use === 'ai' && !Cat.ADC_PINS.includes(pin)) return 'has no usable ADC (use 32-36 or 39)';
     return null;
   }
 
@@ -158,6 +160,18 @@
   }
   function h(c) { return c.hal; }
 
+  // Sensor bus checks of the firmware's deploy(): a 1-Wire pin never doubles as block I/O,
+  // and with a board profile the buses are the board's.
+  function deviceProblem(d, board, pinOwner) {
+    const name = 'Sensor ' + (d.name || d.driver) + ': ';
+    if (d.driver === 'DS18B20') {
+      const pin = Number(d.pin);
+      if (pinOwner.has(pin)) return name + 'GPIO ' + pin + ' is also used by block ' + pinOwner.get(pin).id;
+      if (board && !Boards.isBare(board) && !Boards.oneWirePins(board).includes(pin)) return name + 'GPIO ' + pin + ' is not a 1-Wire terminal on this board';
+    } else if (board && !Boards.hasI2c(board)) return name + 'this board has no I2C bus';
+    return null;
+  }
+
   const BlockProto = {
     inp(c, i, def = 0) { return this.in[i] < 0 ? def : c.sig[this.in[i]]; },
     inb(c, i, def = false) { return this.in[i] < 0 ? def : c.sig[this.in[i]] >= 0.5; },
@@ -165,6 +179,8 @@
   };
 
   class NullHal {
+    // Chip rule first, then the board profile in this.board (if any) narrows it.
+    pinProblem(pin, use) { return chipProblem(pin, use) || Boards.pinProblem(this.board, pin, use); }
     setupInput() {} setupOutput(pin, level) {} readDigital() { return false; } writeDigital() {}
     readAnalog() { return 0; } setupPwm() {} writePwm() {}
     readSensor() { return { ok: false, v: 0 }; } timeOfDay() { return null; }
@@ -185,6 +201,11 @@
     load(prog) {
       if (typeof prog === 'string') { try { prog = JSON.parse(prog); } catch (e) { return 'JSON: ' + e.message; } }
       const blocks = [], byId = new Map(), pinOwner = new Map(), mqtt = {}; let nSig = 0;
+      const board = this.hal.board;  // undefined = no board checks at all (tests, file import)
+      if (board) {
+        const stamp = prog.board === undefined ? 'bare' : String(prog.board), id = Boards.idOf(board);
+        if (stamp !== id) return 'Program was made for board "' + stamp + '" but this board is set to "' + id + '". Open it in the editor and use Retarget, then Deploy.';
+      }
       for (const o of prog.blocks || []) {
         if (!(o.type in N_IN)) return "Unknown block type '" + o.type + "'";
         if (!(o.id > 0) || byId.has(o.id)) return 'Invalid or duplicate block id ' + o.id;
@@ -192,9 +213,13 @@
         if (use) {
           const raw = o.p && o.p.pin, pin = raw === undefined || raw === '' || raw === null ? -1 : Number(raw);
           if (!(pin >= 0)) return 'Block ' + o.id + ' has no GPIO pin';
-          const why = pinProblem(pin, use);
+          const why = this.hal.pinProblem(pin, use);
           if (why) return 'Block ' + o.id + ': GPIO ' + pin + ' ' + why;
-          const prev = pinOwner.get(pin), drives = use === 'out';
+          const fi = board && (o.type === 'DI' || o.type === 'DO') ? Boards.fixedInv(board, pin) : -1;
+          if (fi >= 0 && (Number(o.p.inv) ? 1 : 0) !== fi)
+            return 'Block ' + o.id + ': terminal ' + Boards.labelOf(board, pin) + ' (GPIO ' + pin + ') is active-' + (fi ? 'low' : 'high') + ' on this board: set Invert to ' + (fi ? 'on' : 'off');
+          const drives = use === 'do' || use === 'pwm';
+          const prev = pinOwner.get(pin);
           if (prev && (drives || prev.drives)) return 'GPIO ' + pin + ' is used by block ' + prev.id + ' and block ' + o.id;
           pinOwner.set(pin, { id: o.id, drives: drives || !!(prev && prev.drives) });
         }
@@ -210,6 +235,10 @@
         b.id = o.id; b.type = o.type; b.extra = 0; b.in = [-1, -1, -1, -1]; b.out = [-1, -1];
         for (let i = 0; i < N_OUT[o.type]; i++) b.out[i] = nSig++;
         byId.set(o.id, blocks.length); blocks.push(b);
+      }
+      for (const d of prog.devices || []) {
+        const why = deviceProblem(d, board, pinOwner);
+        if (why) return why;
       }
       const edges = blocks.map(() => []), indeg = blocks.map(() => 0);
       for (const w of prog.wires || []) {
@@ -244,7 +273,13 @@
       return null;
     }
     // Starting from stop rebuilds all blocks: outputs set up again, timers/counters/latches fresh.
-    run() { if (this.running) return; if (this.src) this.load(this.src); this.running = true; }
+    // Returns null or why it cannot start (e.g. the board profile changed since the deploy).
+    run() {
+      if (this.running) return null;
+      if (this.src) { const err = this.load(this.src); if (err) return err; }
+      this.running = true;
+      return null;
+    }
     stop() { this.running = false; this.hal.safeOutputs(); }
     scan(now) {
       if (!this.running || !this.order.length) return;

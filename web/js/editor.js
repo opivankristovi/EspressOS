@@ -22,7 +22,7 @@
   class Editor {
     constructor(svg, opts) {
       this.svg = svg;
-      this.opts = opts;  // {onSelect, onChange, onBlockClick, summary}
+      this.opts = opts;  // {onSelect, onChange, onBlockClick, summary, initBlock}
       this.world = svg.querySelector('#world');
       this.gWires = svg.querySelector('#wires');
       this.gBlocks = svg.querySelector('#blocks');
@@ -76,6 +76,7 @@
         b.p.idx = i;
       }
       if (def.type === 'SENSOR' && this.prog.devices.length) b.p.dev = this.prog.devices[0].id;
+      if (this.opts.initBlock) this.opts.initBlock(b, def);  // e.g. first free terminal of the board profile
       this.prog.blocks.push(b);
       this.select({ kind: 'block', id: b.id });
       this.changed();

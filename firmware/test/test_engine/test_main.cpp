@@ -1,12 +1,18 @@
 // Native engine tests: pio test -e native
 #include <unity.h>
 
+#include <ArduinoJson.h>
+#include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include <fstream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include "Board.h"
 #include "Engine.h"
 
 using namespace eos;
@@ -296,6 +302,203 @@ void test_snapshot_json() {
   TEST_ASSERT_EQUAL_STRING("{\"run\":1,\"cycle\":1,\"b\":{\"5\":[2.5,0]}}", eng->snapshot().c_str());
 }
 
+// ------------------------------------------------------------------ board profiles
+// Repository files are found relative to this source (firmware/test/test_engine),
+// with fallbacks for a relative __FILE__ and the usual working directory (firmware/).
+static std::string readRepoFile(const std::string& rel) {
+  std::string here = __FILE__;
+  size_t slash = here.find_last_of("/\\");
+  std::string dir = slash == std::string::npos ? "." : here.substr(0, slash);
+  for (const std::string& path : {dir + "/../../../" + rel, "../" + rel, rel}) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) continue;
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+  }
+  return "";
+}
+
+// The chip tables are read from EspHal.cpp itself so they stay single-sourced
+// (tools/test_sim.js does the same for the editor's lists).
+static std::vector<int> gOut, gInOnly, gAdc;
+
+static std::vector<int> pinList(const std::string& src, const char* name) {
+  std::vector<int> v;
+  size_t at = src.find(std::string(name) + "[] = {");
+  if (at == std::string::npos) return v;
+  at = src.find('{', at) + 1;
+  std::string body = src.substr(at, src.find('}', at) - at);
+  for (const char* c = body.c_str(); *c;) {
+    if (isdigit((unsigned char)*c)) {
+      char* end;
+      v.push_back((int)strtol(c, &end, 10));
+      c = end;
+    } else {
+      c++;
+    }
+  }
+  return v;
+}
+
+static bool inPins(const std::vector<int>& v, int pin) {
+  for (int p : v)
+    if (p == pin) return true;
+  return false;
+}
+static bool chipOut(int pin) { return inPins(gOut, pin); }
+static bool chipValid(int pin) { return chipOut(pin) || inPins(gInOnly, pin); }
+static bool chipAdc(int pin) { return inPins(gAdc, pin); }
+static const ChipRules kChip = {chipValid, chipOut, chipAdc};
+
+static void loadChipTables() {
+  if (!gOut.empty()) return;
+  std::string src = readRepoFile("firmware/src/EspHal.cpp");
+  gOut = pinList(src, "kOutPins");
+  gInOnly = pinList(src, "kInOnlyPins");
+  gAdc = pinList(src, "kAdcPins");
+  TEST_ASSERT_TRUE_MESSAGE(gOut.size() == 19 && gInOnly.size() == 4 && gAdc.size() == 6, "pin tables not found in firmware/src/EspHal.cpp");
+}
+
+static std::string terminals41() {
+  std::string s = R"({"schema":1,"id":"t-x","name":"X","terminals":[)";
+  for (int i = 1; i <= 41; i++) s += (i > 1 ? "," : "") + std::string(R"({"label":"T)") + std::to_string(i) + R"(","gpio":23,"uses":["di"]})";
+  return s + "]}";
+}
+
+static std::string oversize() {
+  return R"({"schema":1,"id":"t-x","name":"X","terminals":[{"label":"IO1","gpio":23,"uses":["do"]}],"pad":")" + std::string(4100, 'x') + "\"}";
+}
+
+void test_board_vectors() {
+  loadChipTables();
+  std::string text = readRepoFile("tools/board_vectors.json");
+  TEST_ASSERT_FALSE_MESSAGE(text.empty(), "tools/board_vectors.json not found");
+  JsonDocument doc;
+  TEST_ASSERT_FALSE_MESSAGE(deserializeJson(doc, text), "tools/board_vectors.json is not valid JSON");
+  int n = 0;
+  for (JsonObjectConst c : doc["cases"].as<JsonArrayConst>()) {
+    std::string name = c["name"] | "?";
+    std::string gen = c["generate"] | "";
+    bool want = c["ok"] | false;
+    std::string json;
+    if (gen == "terminals41") json = terminals41();
+    else if (gen == "oversize") json = oversize();
+    else if (!gen.empty()) TEST_FAIL_MESSAGE(("unknown generator in case: " + name).c_str());
+    else serializeJson(c["profile"], json);
+    BoardProfile b;
+    std::string err;
+    bool got = b.parse(json.c_str(), err, kChip);
+    std::string msg = name + (got ? ": accepted" : ": rejected (" + err + ")");
+    TEST_ASSERT_TRUE_MESSAGE(got == want, msg.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(got || !err.empty(), msg.c_str());  // a rejection always says why
+    n++;
+  }
+  TEST_ASSERT_TRUE_MESSAGE(n >= 40, "too few cases read from tools/board_vectors.json");
+}
+
+static const char* kMb1 = R"({"schema":1,"id":"eos-mb1","name":"MB-1 Analog + 4 SSR","rev":"A",
+  "i2c":{"sda":21,"scl":22},"onewire":[4],"terminals":[
+  {"label":"AI1","gpio":36,"uses":["ai","di"],"group":"Analog in","note":"0-3.3 V, divider on board"},
+  {"label":"AI2","gpio":39,"uses":["ai","di"],"group":"Analog in"},
+  {"label":"AI3","gpio":34,"uses":["ai","di"],"group":"Analog in"},
+  {"label":"AI4","gpio":35,"uses":["ai","di"],"group":"Analog in"},
+  {"label":"AI5","gpio":32,"uses":["ai","di"],"group":"Analog in"},
+  {"label":"AI6","gpio":33,"uses":["ai","di"],"group":"Analog in"},
+  {"label":"R1","gpio":16,"uses":["do"],"active":"high","group":"Relays","note":"G3MB-202P SSR, AC loads 0.1-2 A"},
+  {"label":"R2","gpio":17,"uses":["do"],"active":"high","group":"Relays"},
+  {"label":"R3","gpio":18,"uses":["do"],"active":"high","group":"Relays"},
+  {"label":"R4","gpio":19,"uses":["do"],"active":"high","group":"Relays"},
+  {"label":"IO1","gpio":23,"uses":["di","do","pwm"],"group":"GPIO"},
+  {"label":"IO2","gpio":25,"uses":["di","do","pwm"],"group":"GPIO"},
+  {"label":"IO3","gpio":26,"uses":["di","do","pwm"],"group":"GPIO"},
+  {"label":"IO4","gpio":27,"uses":["di","do","pwm"],"group":"GPIO"},
+  {"label":"IO5","gpio":13,"uses":["di","do","pwm"],"group":"GPIO"},
+  {"label":"IO6","gpio":14,"uses":["di"],"group":"GPIO","note":"input only: pulses at boot"}]})";
+
+void test_board_preset_queries() {
+  loadChipTables();
+  BoardProfile b;
+  std::string err;
+  TEST_ASSERT_TRUE_MESSAGE(b.parse(kMb1, err, kChip), err.c_str());
+  TEST_ASSERT_FALSE(b.bare());
+  TEST_ASSERT_EQUAL_STRING("eos-mb1", b.id());
+  TEST_ASSERT_EQUAL_STRING("MB-1 Analog + 4 SSR", b.name());
+  // allows(): only the listed uses of wired terminals
+  TEST_ASSERT_TRUE(b.allows(16, PinUse::DigitalOut));
+  TEST_ASSERT_FALSE(b.allows(16, PinUse::DigitalIn));
+  TEST_ASSERT_FALSE(b.allows(16, PinUse::PwmOut));
+  TEST_ASSERT_TRUE(b.allows(36, PinUse::AnalogIn));
+  TEST_ASSERT_TRUE(b.allows(36, PinUse::DigitalIn));
+  TEST_ASSERT_FALSE(b.allows(36, PinUse::DigitalOut));
+  TEST_ASSERT_TRUE(b.allows(23, PinUse::PwmOut));
+  TEST_ASSERT_FALSE(b.allows(23, PinUse::AnalogIn));
+  TEST_ASSERT_TRUE(b.allows(14, PinUse::DigitalIn));
+  TEST_ASSERT_FALSE(b.allows(14, PinUse::DigitalOut));
+  TEST_ASSERT_FALSE(b.allows(2, PinUse::DigitalOut));   // chip-valid but not wired
+  TEST_ASSERT_FALSE(b.allows(21, PinUse::DigitalIn));   // I2C bus
+  TEST_ASSERT_FALSE(b.allows(4, PinUse::DigitalOut));   // 1-Wire
+  TEST_ASSERT_FALSE(b.allows(-1, PinUse::DigitalIn));
+  TEST_ASSERT_EQUAL(0, b.uses(2));
+  TEST_ASSERT_EQUAL(BoardProfile::kDI | BoardProfile::kAI, b.uses(36));
+  // fixedInv(): relays are active-high, everything else is free
+  TEST_ASSERT_EQUAL(0, b.fixedInv(16));
+  TEST_ASSERT_EQUAL(0, b.fixedInv(19));
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(23));
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(2));
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(99));
+  // buses
+  TEST_ASSERT_TRUE(b.hasI2c());
+  TEST_ASSERT_EQUAL(21, b.sda());
+  TEST_ASSERT_EQUAL(22, b.scl());
+  TEST_ASSERT_TRUE(b.oneWireOk(4));
+  TEST_ASSERT_FALSE(b.oneWireOk(23));
+  TEST_ASSERT_FALSE(b.oneWireOk(-1));
+  TEST_ASSERT_TRUE(b.reservedBus(21));
+  TEST_ASSERT_TRUE(b.reservedBus(22));
+  TEST_ASSERT_TRUE(b.reservedBus(4));
+  TEST_ASSERT_FALSE(b.reservedBus(16));
+  TEST_ASSERT_FALSE(b.reservedBus(-1));
+}
+
+void test_board_active_low_and_no_bus() {
+  loadChipTables();
+  BoardProfile b;
+  std::string err;
+  TEST_ASSERT_TRUE_MESSAGE(b.parse(R"({"schema":1,"id":"t-opto","name":"Opto","i2c":null,"terminals":[
+      {"label":"DI1","gpio":36,"uses":["di"],"active":"low","pull":false},{"label":"Q1","gpio":25,"uses":["do","pwm"]}]})", err, kChip), err.c_str());
+  TEST_ASSERT_EQUAL(1, b.fixedInv(36));
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(25));
+  TEST_ASSERT_FALSE(b.hasI2c());
+  TEST_ASSERT_EQUAL(-1, b.sda());
+  TEST_ASSERT_EQUAL(-1, b.scl());
+  TEST_ASSERT_FALSE(b.oneWireOk(4));  // no onewire list = no DS18B20 anywhere
+  TEST_ASSERT_FALSE(b.reservedBus(21));
+}
+
+void test_board_bare_and_failed_parse_keeps_old() {
+  loadChipTables();
+  BoardProfile b;
+  TEST_ASSERT_TRUE(b.bare());  // a fresh profile is bare
+  TEST_ASSERT_EQUAL_STRING("bare", b.id());
+  TEST_ASSERT_TRUE(b.allows(2, PinUse::DigitalOut));  // bare: chip rules only (checked by the HAL)
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(16));
+  TEST_ASSERT_TRUE(b.oneWireOk(23));
+  TEST_ASSERT_FALSE(b.reservedBus(21));
+  TEST_ASSERT_TRUE(b.hasI2c());  // bus pins come from Settings
+  std::string err;
+  TEST_ASSERT_TRUE_MESSAGE(b.parse(kMb1, err, kChip), err.c_str());
+  TEST_ASSERT_FALSE(b.parse(R"({"schema":1,"id":"t-x","name":"X","terminals":[{"label":"IO1","gpio":6,"uses":["di"]}]})", err, kChip));
+  TEST_ASSERT_FALSE(err.empty());
+  TEST_ASSERT_EQUAL_STRING("eos-mb1", b.id());  // the rejected profile changed nothing
+  TEST_ASSERT_TRUE(b.allows(16, PinUse::DigitalOut));
+  TEST_ASSERT_FALSE(b.parse("{not json", err, kChip));
+  TEST_ASSERT_TRUE(b.parse(R"({"id":"bare"})", err, kChip));
+  TEST_ASSERT_TRUE(b.bare());
+  TEST_ASSERT_EQUAL(-1, b.fixedInv(16));
+  TEST_ASSERT_EQUAL(-1, b.sda());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_gates_truth_table);
@@ -315,5 +518,9 @@ int main() {
   RUN_TEST(test_bad_pins_rejected);
   RUN_TEST(test_mqtt_in_out);
   RUN_TEST(test_mqtt_topics_checked);
+  RUN_TEST(test_board_vectors);
+  RUN_TEST(test_board_preset_queries);
+  RUN_TEST(test_board_active_low_and_no_bus);
+  RUN_TEST(test_board_bare_and_failed_parse_keeps_old);
   return UNITY_END();
 }

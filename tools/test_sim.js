@@ -205,6 +205,18 @@ test('engine rejects unusable, input-only and shared pins', () => {
   assert.equal(load([{ id: 1, type: 'DI', p: { pin: 4 } }, { id: 2, type: 'DI', p: { pin: 4 } }]), null);
 });
 
+test('pin rules live on the HAL; no board means the chip rules only', () => {
+  const hal = new NullHal();
+  assert.equal(hal.pinProblem(34, 'di'), null);
+  assert.equal(hal.pinProblem(34, 'do'), 'is input-only');
+  assert.equal(hal.pinProblem(34, 'pwm'), 'is input-only');
+  assert.match(hal.pinProblem(25, 'ai'), /no usable ADC/);
+  assert.match(hal.pinProblem(6, 'di'), /flash chip/);
+  // a HAL can narrow it further, and Engine.load asks the HAL
+  class Narrow extends NullHal { pinProblem(pin, use) { return pin === 4 ? 'is reserved here' : super.pinProblem(pin, use); } }
+  assert.match(new Engine(new Narrow()).load({ blocks: [{ id: 1, type: 'DI', p: { pin: 4 } }], wires: [] }), /Block 1: GPIO 4 is reserved here/);
+});
+
 test('pin lists match the firmware (EspHal.cpp)', () => {
   const fs = require('fs');
   const src = fs.readFileSync(path.join(__dirname, '../firmware/src/EspHal.cpp'), 'utf8');

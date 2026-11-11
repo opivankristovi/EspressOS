@@ -1,13 +1,16 @@
 // Fake EspressOS board for UI development: node tools/mock_server.js [port] [--configured]
 // Serves web/ and implements the REST API with the JS engine. No WebSocket,
 // so the UI falls back to polling /api/monitor (also exercises that path).
-// Mirrors the firmware's request rules: writes need the X-EOS header, and in
-// setup mode (no admin password yet) only POST /api/config is accepted.
-// It does NOT implement HTTP Basic auth: --configured just skips setup mode.
+// Mirrors the firmware's request rules: writes need the X-EOS header (and a same-host
+// Origin when a browser sends one), and in setup mode (no admin password yet) only
+// POST /api/config is accepted. It does NOT implement HTTP Basic auth: --configured
+// just skips setup mode. A board profile (POST /api/board) applies at once, no reboot.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Engine, NullHal } = require('../web/js/sim.js');
+const Boards = require('../web/js/boards.js');
+const Catalog = require('../web/js/catalog.js');
 
 const PORT = Number(process.argv[2]) || 8080;
 const WEB = path.join(__dirname, '..', 'web');
@@ -28,12 +31,16 @@ class MockHal extends NullHal {
   timeOfDay() { const d = new Date(); return { dow: d.getDay(), m: d.getHours() * 60 + d.getMinutes() }; }
 }
 const engine = new Engine(new MockHal());
+engine.hal.board = Boards.BARE;  // checked by engine.load like the firmware's deploy()
 let program = { version: 1, cycleMs: 10, blocks: [], wires: [], devices: [] };
 let lastError = '';
 let hasAdminPass = process.argv.includes('--configured');
 let mqtt = { host: '', port: 1883, user: '', pass: '', base: '', ha: true, haPrefix: 'homeassistant' };
 const mqttPublic = () => ({ host: mqtt.host, port: mqtt.port, user: mqtt.user, hasPass: !!mqtt.pass, base: mqtt.base, defaultBase: 'espressos/mock', ha: mqtt.ha, haPrefix: mqtt.haPrefix });
-const validI2c = (a, b) => Number.isInteger(a) && Number.isInteger(b) && a !== b && [a, b].every((p) => p >= 0 && p < 34 && !(p >= 6 && p <= 11) && ![20, 24, 28, 29, 30, 31].includes(p));
+const validI2c = (a, b) => a !== b && [a, b].every((p) => Number.isInteger(p) && Catalog.OUT_PINS.includes(p));
+let i2cCfg = { sda: 21, scl: 22 };  // Settings; a board profile overrides it
+const bare = () => Boards.isBare(engine.hal.board);
+const i2cNow = () => (bare() ? i2cCfg : Boards.i2cOf(engine.hal.board) || { sda: -1, scl: -1 });
 const t0 = Date.now();
 setInterval(() => engine.scan(Date.now() - t0), 10);
 
@@ -44,7 +51,18 @@ function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'applicati
 
 const routes = {
   'GET /api/info': () => ({ version: '0.1.0-mock', uptime: Math.round((Date.now() - t0) / 1000), heap: 182000, ap: false, ip: '127.0.0.1', rssi: -55,
-    host: 'mock', setup: !hasAdminPass, mqtt: mqtt.host ? 'cannot reach the broker (retrying)' : 'off', running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true }),
+    host: 'mock', setup: !hasAdminPass, mqtt: mqtt.host ? 'cannot reach the broker (retrying)' : 'off', running: engine.running, blocks: engine.blocks.length, cycleMs: engine.cycleMs, cycles: engine.cycles, error: lastError, timeSynced: true,
+    board: { id: Boards.idOf(engine.hal.board), name: engine.hal.board.name || '' }, boardError: '' }),
+  'GET /api/board': () => (bare() ? { schema: 1, ...Boards.BARE } : engine.hal.board),
+  'POST /api/board': (b) => {
+    if (Buffer.byteLength(b) > 4096) return { status: 400, body: { ok: false, err: 'Profile is too large (max 4096 bytes)' } };
+    let p; try { p = JSON.parse(b); } catch (e) { return { status: 400, body: { ok: false, err: 'JSON: ' + e.message } }; }
+    const err = Boards.validate(p);
+    if (err) return { status: 400, body: { ok: false, err } };
+    engine.stop();  // the real board reboots; the stored program then waits for a deploy stamped for this board
+    engine.hal.board = Boards.isBare(p) ? Boards.BARE : p;
+    return { ok: true };
+  },
   'GET /api/program': () => program,
   'POST /api/program': (b) => {
     let p; try { p = JSON.parse(b); } catch (e) { return { status: 400, body: { ok: false, err: 'JSON: ' + e.message } }; }
@@ -56,7 +74,7 @@ const routes = {
     program = p; devices = p.devices || []; lastError = ''; engine.run();
     return { ok: true };
   },
-  'POST /api/run': () => { engine.run(); return { ok: true }; },
+  'POST /api/run': () => { const err = engine.run(); if (err) { lastError = err; return { status: 400, body: { ok: false, err } }; } return { ok: true }; },
   'POST /api/stop': () => { engine.stop(); return { ok: true }; },
   'POST /api/vin': (b) => { const d = JSON.parse(b); vin[d.idx] = Number(d.value); return { ok: true }; },
   'GET /api/monitor': () => {
@@ -66,13 +84,16 @@ const routes = {
     return s;
   },
   'GET /api/drivers': () => ['BME280', 'SHT31', 'BH1750', 'DS18B20', 'ADS1115', 'I2C_GENERIC'],
-  'GET /api/i2c/scan': () => ({ sda: 21, scl: 22, found: [0x23, 0x3c, 0x76] }),
-  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass, apKey: hasAdminPass ? 'k7mq2xw9hpta' : '', mqtt: mqttPublic() }),
+  'GET /api/i2c/scan': () => (i2cNow().sda < 0 ? { sda: -1, scl: -1, found: [], error: 'This board has no I2C bus' } : { ...i2cNow(), found: [0x23, 0x3c, 0x76] }),
+  'GET /api/config': () => ({ ssid: 'HomeWifi', host: 'mock', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', ...i2cNow(), ...(bare() ? {} : { i2cFixed: true }), hasAdminPass, apKey: hasAdminPass ? 'k7mq2xw9hpta' : '', mqtt: mqttPublic() }),
   'POST /api/config': (b) => {
     let d; try { d = JSON.parse(b); } catch { return { status: 400, body: { ok: false, err: 'Bad JSON' } }; }
     if (!hasAdminPass && !d.adminPass) return { status: 400, body: { ok: false, err: 'Choose an admin password first' } };
     if (d.adminPass !== undefined && String(d.adminPass).length < 8) return { status: 400, body: { ok: false, err: 'Admin password needs at least 8 characters' } };
-    if (!validI2c(d.sda ?? 21, d.scl ?? 22)) return { status: 400, body: { ok: false, err: 'I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)' } };
+    if (!bare() && (d.sda !== undefined || d.scl !== undefined)) {
+      const now = i2cNow();
+      if (d.sda !== now.sda || d.scl !== now.scl) return { status: 400, body: { ok: false, err: 'The I2C pins are fixed by the board profile' } };
+    } else if (!validI2c(d.sda ?? i2cCfg.sda, d.scl ?? i2cCfg.scl)) return { status: 400, body: { ok: false, err: 'I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)' } };
     if (d.mqtt) {
       const m = { ...mqtt, ...d.mqtt };
       if (!/^[A-Za-z0-9._-]{0,64}$/.test(m.host)) return { status: 400, body: { ok: false, err: "MQTT broker: use a host name or IP address (letters, digits, '.', '-')" } };
@@ -83,6 +104,7 @@ const routes = {
       mqtt = m;
     }
     if (d.adminPass) hasAdminPass = true;
+    if (bare() && d.sda !== undefined) i2cCfg = { sda: d.sda ?? i2cCfg.sda, scl: d.scl ?? i2cCfg.scl };
     return { ok: true };
   },
   'POST /api/reboot': () => ({ ok: true }),
@@ -92,6 +114,8 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const key = req.method + ' ' + url.pathname;
   if (url.pathname.startsWith('/api/') && req.method !== 'GET') {
+    const origin = req.headers.origin;  // browsers send it; it must name this server (cross-site guard)
+    if (origin && origin.replace(/^[a-z]+:\/\//i, '').toLowerCase() !== String(req.headers.host).toLowerCase()) return json(res, 403, { ok: false, err: 'Cross-site request blocked' });
     if (!req.headers['x-eos']) return json(res, 403, { ok: false, err: 'Missing X-EOS header' });
     if (!hasAdminPass && url.pathname !== '/api/config') return json(res, 403, { ok: false, err: 'Set an admin password first (Settings)' });
   }

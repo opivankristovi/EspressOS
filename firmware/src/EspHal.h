@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
+#include "Board.h"
 #include "Engine.h"
 
 // ESP32 implementation of the engine HAL.
@@ -8,6 +9,8 @@ class EspHal : public eos::Hal {
  public:
   static constexpr int kVirtual = 16;
   volatile float vin[kVirtual] = {};
+  // Active board profile (narrows pinProblem); nullptr = chip rules only.
+  const eos::BoardProfile* board = nullptr;
 
   void setupInput(int pin, bool pullup) override;
   void setupOutput(int pin, bool level) override;
@@ -29,6 +32,8 @@ class EspHal : public eos::Hal {
 
   static bool validPin(int pin);
   static bool outputCapable(int pin);
+  static bool adcCapable(int pin);
+  static eos::ChipRules chipRules() { return {validPin, outputCapable, adcCapable}; }
 
  private:
   uint64_t outMask_ = 0;  // pins configured as digital outputs

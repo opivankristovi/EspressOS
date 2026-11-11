@@ -650,9 +650,11 @@ END_IF;`,
   const isConversion = (t) => /^[A-Z]+_TO_[A-Z]+$/.test(t) || /^TRUNC$/.test(t);
 
   /**
+   * opts.noPins: leave I/O blocks without a pin (a board profile is active, and GPIO
+   * numbers from another tool say nothing about its terminals).
    * @returns {prog, warnings[]}
    */
-  function importPLCopen(xmlText) {
+  function importPLCopen(xmlText, opts = {}) {
     const warnings = [];
     const doc = parseXml(xmlText);
     if (doc.name !== 'project') throw new Error('Not a PLCopen XML project');
@@ -764,6 +766,7 @@ END_IF;`,
     // boot-strapping / on-board-LED pins; never the default I2C pins 21/22.
     const PREFER = [4, 5, 13, 14, 16, 17, 18, 19, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39, 2, 12, 15];
     const pickPin = (list0, want, what, name) => {
+      if (opts.noPins) { warnings.push(`${what} ${name}: pick a terminal of your board for it.`); return undefined; }
       const list = PREFER.filter((p) => list0.includes(p));
       if (want !== undefined && want !== null && list.includes(Number(want)) && !usedPins.has(Number(want))) { usedPins.add(Number(want)); return Number(want); }
       if (want !== undefined && want !== null && !list.includes(Number(want))) warnings.push(`${what} ${name}: GPIO ${want} from the file cannot be used for this; another pin was picked.`);

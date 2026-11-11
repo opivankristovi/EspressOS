@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const C = window.Catalog;
+  const Boards = window.Boards;
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const h = (tag, attrs = {}, ...kids) => {
@@ -30,6 +31,8 @@
   let i2cBus = { sda: 21, scl: 22 };  // replaced by the board's settings once known
   let mqttCfg = null;     // the board's MQTT settings (null in the simulator / unknown)
   let connReason = '';    // 'board' | 'forced' | 'unreachable'
+  let board = Boards.BARE; // the board profile the backend runs with
+  let customBoards = [];  // profiles imported from files (validated), kept in this browser
   const isPhone = () => window.matchMedia('(max-width: 900px)').matches;
   const openSide = (on) => $('.side').classList.toggle('open', on);
 
@@ -66,6 +69,44 @@
   function driverOf(devId) {
     const d = editor.prog.devices.find((x) => x.id === Number(devId));
     return d ? C.DRIVERS.find((x) => x.id === d.driver) : null;
+  }
+
+  // ------------------------------------------------------------ board profile helpers
+  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  const bare = () => Boards.isBare(board);
+  const hasPin = (p) => !!p && p.pin !== undefined && p.pin !== '' && p.pin !== null;
+  // How a pin is shown: "GPIO 16" on a bare board (as always), the terminal label ("R1") on a profile.
+  const pinName = (pin) => (bare() ? 'GPIO ' + pin : pin === undefined || pin === '' || pin === null ? 'no terminal' : Boards.labelOf(board, pin));
+  // A terminal's fixed active level and pull-up default go into the block when the pin is picked.
+  function terminalDefaults(type, p) {
+    const fi = Boards.fixedInv(board, p.pin);
+    if (fi >= 0 && (type === 'DI' || type === 'DO')) p.inv = fi;
+    const t = Boards.terminalOf(board, p.pin);
+    if (type === 'DI' && t && typeof t.pull === 'boolean') p.pull = t.pull ? 1 : 0;
+  }
+  // New I/O blocks on a profile get the first terminal no other block uses yet.
+  function initBlock(b, def) {
+    const use = IO_USE[def.type];
+    if (!use || bare()) return;
+    const taken = new Set(editor.prog.blocks.filter((x) => IO_USE[x.type] && hasPin(x.p)).map((x) => Number(x.p.pin)));
+    const free = Boards.pinsFor(board, use).find((g) => !taken.has(g));
+    if (free === undefined) { delete b.p.pin; return; }
+    b.p.pin = free;
+    terminalDefaults(def.type, b.p);
+  }
+  const sameProfile = (a, b) => (Boards.isBare(a) || Boards.isBare(b) ? Boards.isBare(a) && Boards.isBare(b) : JSON.stringify(a) === JSON.stringify(b));
+  // The profile a program's stamp names, as far as this browser knows it (unknown id: no terminal names).
+  function stampedBoard(prog) {
+    if (prog.board === undefined || prog.board === 'bare') return Boards.BARE;
+    if (prog.board === board.id) return board;
+    return [...Boards.PRESETS, ...customBoards].find((x) => x.id === prog.board) || { id: String(prog.board), name: String(prog.board), terminals: [] };
+  }
+  function retargetProgram() {
+    const { prog, notes } = Boards.retarget(editor.prog, stampedBoard(editor.prog), board);
+    editor.checkpoint();
+    editor.setProgram(prog, true);
+    editor.changed();
+    showReport('Retargeted to ' + board.name, [notes.length ? 'These changes were made. Check them, then press Deploy:' : 'No pin changes were needed. Press Deploy.'], [], notes);
   }
 
   // ------------------------------------------------------------ tabs
@@ -109,6 +150,8 @@
       const ch = drv && drv.ch[b.p.ch];
       return (dev.name || dev.driver) + (ch ? ' · ' + ch[0] : '');
     }
+    if (IO_USE[d.type] && !bare())  // terminal label; "inv" only when it is the user's choice, not the board's
+      return pinName(b.p.pin) + ((d.type === 'DI' || d.type === 'DO') && Number(b.p.inv) && Boards.fixedInv(board, b.p.pin) < 0 ? ' inv' : '');
     return d.sum ? d.sum(b.p) : '';
   }
 
@@ -138,8 +181,15 @@
       } else if (q.type === 'text') {
         pane.append(h('label', {}, q.label, h('input', { value: p[q.key] || '', onchange: (e) => { p[q.key] = e.target.value; commit(); } })));
       } else if (q.type === 'bool') {
-        pane.append(h('label', { class: 'inline' }, h('input', { type: 'checkbox', checked: !!Number(p[q.key]), onchange: (e) => { p[q.key] = e.target.checked ? 1 : 0; commit(); } }), q.label));
-      } else if (q.type === 'select') {
+        const fixed = q.key === 'inv' ? Boards.fixedInv(board, p.pin) : -1;  // the board's terminal decides
+        pane.append(h('label', { class: 'inline', title: fixed >= 0 ? 'Set by the board: this terminal is active-' + (fixed ? 'low' : 'high') : null },
+          h('input', { type: 'checkbox', checked: fixed >= 0 ? !!fixed : !!Number(p[q.key]), disabled: fixed >= 0, onchange: (e) => { p[q.key] = e.target.checked ? 1 : 0; commit(); } }),
+          q.label + (fixed >= 0 ? ' (set by the board)' : '')));
+      } else if (q.type === 'pin' && !bare()) {
+        pane.append(h('label', {}, 'Terminal', terminalSelect(q.use, p, () => { terminalDefaults(b.type, p); commit(); renderProps(editor.block(b.id)); })));
+        const clash = pinClash(b);
+        if (clash) pane.append(h('p', { class: 'help', style: 'color:var(--warn)' }, clash));
+      } else if (q.type === 'select' || q.type === 'pin') {
         const sel = h('select', { onchange: (e) => { const o = q.options.find((x) => String(x[0]) === e.target.value); p[q.key] = o ? o[0] : e.target.value; commit(); } },
           q.options.map(([v, l]) => h('option', { value: v, selected: String(v) === String(p[q.key]) }, l)));
         pane.append(h('label', {}, q.label, sel));
@@ -175,9 +225,30 @@
     if (isPhone()) openSide(true);
   }
 
+  // Terminals of the profile for one use, grouped like the board's silk screen: "R1 · Relays (GPIO 16)".
+  function terminalSelect(use, p, onPick) {
+    const cur = hasPin(p) ? Number(p.pin) : null;
+    const terms = Boards.pinsFor(board, use).map((g) => Boards.terminalOf(board, g));
+    const groups = [...new Set(terms.map((t) => t.group || ''))];
+    const opt = (t) => h('option', { value: t.gpio, selected: t.gpio === cur, title: t.note || null }, t.label + (t.group ? ' · ' + t.group : '') + ' (GPIO ' + t.gpio + ')');
+    const kids = [];
+    if (cur === null || !terms.some((t) => t.gpio === cur)) kids.push(h('option', { value: '', selected: true }, cur === null ? '– pick a terminal –' : 'GPIO ' + cur + ' (not on this board)'));
+    for (const g of groups) {
+      const opts = terms.filter((t) => (t.group || '') === g).map(opt);
+      kids.push(g ? h('optgroup', { label: g }, opts) : opts);
+    }
+    return h('select', { onchange: (e) => { if (e.target.value === '') delete p.pin; else p.pin = Number(e.target.value); onPick(); } }, kids);
+  }
+
   function pinClash(b) {
     if (b.p.pin === undefined) return '';
     const others = editor.prog.blocks.filter((x) => x.id !== b.id && ['DI', 'DO', 'AI', 'AO'].includes(x.type) && Number(x.p.pin) === Number(b.p.pin));
+    if (!bare()) {  // the board's own notes replace the dev-board hints
+      const t = Boards.terminalOf(board, b.p.pin);
+      let msg = others.length ? pinName(b.p.pin) + ' is also used by ' + others.map((x) => 'B' + x.id).join(', ') + '.' : '';
+      if (t && t.note) msg += ' ' + t.label + ': ' + t.note + '.';
+      return msg.trim();
+    }
     let msg = others.length ? 'GPIO ' + b.p.pin + ' is also used by ' + others.map((x) => 'B' + x.id).join(', ') + '.' : '';
     if ([21, 22].includes(Number(b.p.pin))) msg += ' GPIO 21/22 are the default I²C pins.';
     if (Number(b.p.pin) === 2) msg += ' GPIO 2 is the on-board LED on most dev boards.';
@@ -195,9 +266,21 @@
       if (['DI', 'DO', 'AI', 'AO'].includes(b.type)) {
         const k = Number(b.p.pin);
         const isOut = b.type === 'DO' || b.type === 'AO';
-        const allowed = b.type === 'AI' ? C.ADC_PINS : isOut ? C.OUT_PINS : C.IN_PINS;
-        if (!allowed.includes(k)) out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: GPIO ${b.p.pin} cannot be used for this (pick another pin)` });
-        if (pins[k] && (isOut || pins[k].out)) out.push({ lvl: 'err', msg: `GPIO ${k} used by B${pins[k].id} and B${b.id}` });
+        if (bare()) {
+          const allowed = b.type === 'AI' ? C.ADC_PINS : isOut ? C.OUT_PINS : C.IN_PINS;
+          if (!allowed.includes(k)) out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: GPIO ${b.p.pin} cannot be used for this (pick another pin)` });
+        } else if (!hasPin(b.p)) {
+          out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: pick a terminal`, pin: true });
+          continue;
+        } else {
+          if (!Boards.pinsFor(board, IO_USE[b.type]).includes(k)) {
+            const t = Boards.terminalOf(board, k), bus = Boards.busOf(board, k);
+            out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: ` + (t ? `${t.label} is ${t.uses.map((u) => Boards.USE_NAME[u]).join(' / ')} only` : bus ? `GPIO ${k} is the ${bus} bus of this board` : `GPIO ${k} is not a terminal of this board`) + ' (pick another terminal)', pin: true });
+          }
+          const fi = b.type === 'DI' || b.type === 'DO' ? Boards.fixedInv(board, k) : -1;
+          if (fi >= 0 && (Number(b.p.inv) ? 1 : 0) !== fi) out.push({ lvl: 'err', msg: `B${b.id}: ${pinName(k)} is active-${fi ? 'low' : 'high'} on this board: Invert must be ${fi ? 'on' : 'off'}`, pin: true });
+        }
+        if (pins[k] && (isOut || pins[k].out)) out.push({ lvl: 'err', msg: `${bare() ? 'GPIO ' + k : pinName(k)} used by B${pins[k].id} and B${b.id}` });
         if (i2cBus && prog.devices.some((x) => x.driver !== 'DS18B20') && (k === i2cBus.sda || k === i2cBus.scl))
           out.push({ lvl: 'err', msg: `B${b.id}: GPIO ${k} is the I²C bus used by your sensors` });
         pins[k] = { id: b.id, out: isOut || !!(pins[k] && pins[k].out) };
@@ -229,17 +312,31 @@
       vins[i] = b.id;
     }
     if (builtDrivers) for (const dv of prog.devices) if (!builtDrivers.includes(dv.driver)) out.push({ lvl: 'err', msg: `Driver ${dv.driver} is not in this firmware` });
+    for (const dv of prog.devices) {
+      const name = dv.name || dv.driver;
+      if (dv.driver === 'DS18B20') {
+        if (pins[Number(dv.pin)]) out.push({ lvl: 'err', msg: `Sensor ${name}: GPIO ${dv.pin} is also used by B${pins[Number(dv.pin)].id}` });
+        if (!bare() && !Boards.oneWirePins(board).includes(Number(dv.pin))) out.push({ lvl: 'err', msg: `Sensor ${name}: GPIO ${dv.pin} is not a 1-Wire terminal on this board` });
+      } else if (!Boards.hasI2c(board)) out.push({ lvl: 'err', msg: `Sensor ${name}: this board has no I²C bus` });
+    }
+    // Board stamp: a program made for another board must be retargeted (the board refuses it otherwise).
+    const act = { label: 'Retarget to ' + board.name, fn: retargetProgram };
+    if (prog.board !== undefined && String(prog.board) !== Boards.idOf(board))
+      out.unshift({ lvl: 'err', msg: `This program was made for board "${prog.board}", but the board is set to ${board.name}.`, act });
+    else if (prog.board === undefined && !bare() && out.some((i) => i.pin))
+      out.unshift({ lvl: 'warn', msg: `This program was made for a bare ESP32. Retarget it to map its pins onto the terminals of ${board.name}.`, act });
     return out;
   }
   function renderIssuesBox() {
     const issues = validate(editor.prog);
     if (!issues.length) return h('p', { class: 'help' }, editor.prog.blocks.length ? '✓ No problems found.' : '');
-    return h('div', {}, h('h3', {}, 'Check'), h('ul', { class: 'issues' }, issues.map((i) => h('li', { class: i.lvl }, i.msg))));
+    return h('div', {}, h('h3', {}, 'Check'), h('ul', { class: 'issues' }, issues.map((i) => h('li', { class: i.lvl }, i.msg,
+      i.act ? h('div', {}, h('button', { class: 'btn sm', type: 'button', onclick: i.act.fn }, i.act.label)) : null))));
   }
 
   // ------------------------------------------------------------ live panel
   function liveStructureKey() {
-    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'DO', 'AO', 'MQTTIN', 'MQTTOUT'].includes(b.type)).map((b) => [b.id, b.p, b.note]), editor.prog.devices, be.kind]);
+    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'DO', 'AO', 'MQTTIN', 'MQTTOUT'].includes(b.type)).map((b) => [b.id, b.p, b.note]), editor.prog.devices, be.kind, Boards.idOf(board)]);
   }
   function renderLive() {
     const key = liveStructureKey();
@@ -272,17 +369,17 @@
       if (be.kind === 'sim') {
         const dis = prog.blocks.filter((b) => b.type === 'DI'), ais = prog.blocks.filter((b) => b.type === 'AI');
         if (dis.length || ais.length) pane.append(h('h3', {}, 'Simulated inputs'));
-        for (const b of dis) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || 'GPIO ' + b.p.pin}`),
+        for (const b of dis) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)}`),
           h('button', { class: 'switch', 'data-din': b.p.pin, onclick: (e) => be.setDin(b.p.pin, !e.currentTarget.classList.contains('on')) })));
         for (const b of ais) {
-          pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || 'GPIO ' + b.p.pin}`), h('span', { class: 'v', 'data-ain-out': b.id })));
+          pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)}`), h('span', { class: 'v', 'data-ain-out': b.id })));
           pane.append(h('input', { type: 'range', class: 'slider', min: 0, max: 4095, value: be.hal.ain[b.p.pin] || 0, oninput: (e) => be.setAin(b.p.pin, Number(e.target.value)) }));
         }
       }
       const outs = prog.blocks.filter((b) => b.type === 'DO' || b.type === 'AO');
       if (outs.length) {
         pane.append(h('h3', {}, 'Outputs'));
-        for (const b of outs) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || 'GPIO ' + b.p.pin}`),
+        for (const b of outs) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)}`),
           b.type === 'DO' ? h('span', { class: 'lamp', 'data-out': b.id }) : h('span', { class: 'v', 'data-out': b.id })));
       }
       const mqs = prog.blocks.filter((b) => b.type === 'MQTTIN' || b.type === 'MQTTOUT');
@@ -421,6 +518,8 @@
     $('#btnDeploy').disabled = true;
     try {
       if (!(await okToReplace())) return;
+      // Lint passed, so the pins fit this board: stamp it (no stamp = bare, as before profiles).
+      if (bare()) delete editor.prog.board; else editor.prog.board = board.id;
       const r = await be.deploy(editor.prog);
       if (r && r.ok) {
         deployedJson = progJson(editor.prog);
@@ -435,6 +534,8 @@
   async function refreshInfo() {
     try {
       const i = await be.info();
+      showBoardError(i.boardError);
+      if (i.board && i.board.id !== '?' && i.board.id !== Boards.idOf(board)) { await loadBoard(); boardChanged(); }
       const conn = $('#conn');
       if (be.kind === 'sim') { conn.textContent = 'Simulator'; conn.className = 'pill sim'; }
       else { conn.textContent = (i.ap ? 'Setup AP · ' : '') + i.host + ' · ' + i.ip; conn.className = 'pill ok'; }
@@ -466,11 +567,13 @@
   }
   function addDevice(driverId, addr) {
     const drv = C.DRIVERS.find((d) => d.id === driverId);
+    if (drv.bus === 'i2c' && !Boards.hasI2c(board)) return toast(board.name + ' has no I²C bus', true);
+    if (drv.bus === 'onewire' && !Boards.oneWirePins(board).length) return toast(board.name + ' has no 1-Wire terminal', true);
     editor.checkpoint();
     const id = editor.prog.devices.reduce((m, d) => Math.max(m, d.id), 0) + 1;
     const dev = { id, driver: drv.id, name: drv.id.replace('_GENERIC', '') + (id > 1 ? ' ' + id : ''), poll: 2 };
     if (drv.bus === 'i2c') dev.addr = addr || drv.addrs[0] || 0x40;
-    if (drv.bus === 'onewire') dev.pin = 4;
+    if (drv.bus === 'onewire') dev.pin = bare() ? 4 : Boards.oneWirePins(board)[0];
     if (drv.generic) Object.assign(dev, { reg: 0, len: 2, signed: false, be: true, scale: 1, offset: 0 });
     editor.prog.devices.push(dev);
     editor.changed();
@@ -494,7 +597,11 @@
           ? h('input', { value: hex(d.addr), onchange: upd('addr', (v) => parseInt(v, 16) || 0) })
           : h('select', { onchange: upd('addr', Number) }, opts.map((a) => h('option', { value: a, selected: a === d.addr }, hex(a))))));
       }
-      if (drv.bus === 'onewire') fields.append(h('label', {}, 'Data pin', h('select', { onchange: upd('pin', Number) }, C.OUT_PINS.map((p) => h('option', { value: p, selected: p === d.pin }, 'GPIO ' + p)))));
+      if (drv.bus === 'onewire') {
+        const ow = Boards.oneWirePins(board);
+        if (!ow.includes(d.pin) && !bare()) ow.unshift(d.pin);  // keep showing a pin the board does not offer (lint flags it)
+        fields.append(h('label', {}, 'Data pin', h('select', { onchange: upd('pin', Number) }, ow.map((p) => h('option', { value: p, selected: p === d.pin }, 'GPIO ' + p)))));
+      }
       if (drv.generic) {
         fields.append(
           h('label', {}, 'Register', h('input', { value: hex(d.reg), onchange: upd('reg', (v) => parseInt(v, 16) || 0) })),
@@ -545,17 +652,25 @@
   }
 
   // ------------------------------------------------------------ settings page
+  let i2cFixed = false;
   async function loadSettings() {
     const f = $('#formWifi');
     $('#cycleMs').value = String(editor.prog.cycleMs || 10);
     try {
       const c = await be.getConfig();
       f.ssid.value = c.ssid || ''; f.host.value = c.host || ''; f.tz.value = c.tz || ''; f.sda.value = c.sda; f.scl.value = c.scl;
+      // A board profile fixes (or removes) the I2C bus: show it, but it is not a setting then.
+      i2cFixed = !!c.i2cFixed;
+      f.sda.readOnly = f.scl.readOnly = i2cFixed;
+      $('#i2cRow').hidden = i2cFixed && !(c.sda >= 0);
+      $('#i2cNote').textContent = !i2cFixed ? '' : c.sda >= 0 ? 'The I²C pins are fixed by the board profile.' : 'This board has no I²C bus.';
+      if (Number.isInteger(c.sda)) i2cBus = { sda: c.sda, scl: c.scl };
       f.adminPass.placeholder = c.hasAdminPass ? 'unchanged' : 'none (open access)';
       $('#apKey').textContent = c.apKey || '';
       $('#apKeyInfo').hidden = !c.apKey;
       fillMqtt(c.mqtt);
     } catch { /* offline */ }
+    renderBoardCard();
     refreshInfo();
   }
   function fillMqtt(m) {
@@ -594,7 +709,8 @@
     const f = $('#formWifi');
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const c = { ssid: f.ssid.value, host: f.host.value || 'espressos', tz: f.tz.value, sda: Number(f.sda.value), scl: Number(f.scl.value) };
+      const c = { ssid: f.ssid.value, host: f.host.value || 'espressos', tz: f.tz.value };
+      if (!i2cFixed) { c.sda = Number(f.sda.value); c.scl = Number(f.scl.value); }
       if (f.pass.value) c.pass = f.pass.value;
       if (f.adminPass.value) {
         if (f.adminPass.value.length < 8) return toast('Admin password needs at least 8 characters', true);
@@ -617,7 +733,7 @@
       const name = (editor.prog.name || 'EspressOS program');
       const r = PLCopen.exportPLCopen(editor.prog, { name, version: 'EspressOS' });
       download(new Blob([r.xml], { type: 'application/xml' }), 'espressos-program.xml');
-      const io = r.ioMap.map((m) => `${m.address}  →  GPIO ${m.pin}  (B${m.block}, ${m.kind})`);
+      const io = r.ioMap.map((m) => `${m.address}  →  ${bare() ? '' : Boards.labelOf(board, m.pin) + ' = '}GPIO ${m.pin}  (B${m.block}, ${m.kind})`);
       showReport('Exported as PLCopen XML', [
         'Open the file in OpenPLC Editor or Beremiz (File → Open). The program is called "main"; helper blocks are named EOS_*.',
         ...(io.length ? ['In OpenPLC, set these pins for your ESP32 board so the addresses match your wiring:'] : []),
@@ -629,10 +745,17 @@
       try {
         const text = await file.text();
         let p, warnings = [];
-        if (/^\s*</.test(text)) ({ prog: p, warnings } = PLCopen.importPLCopen(text));
+        // Under a board profile, GPIO numbers from another tool mean nothing: the user picks terminals.
+        if (/^\s*</.test(text)) ({ prog: p, warnings } = PLCopen.importPLCopen(text, { noPins: !bare() }));
         else p = JSON.parse(text);
         if (!Array.isArray(p.blocks) || !Array.isArray(p.wires)) throw new Error('not an EspressOS program');
-        const err = new Sim.Engine().load(p);
+        const chk = JSON.parse(JSON.stringify(p));  // check the structure; blocks still waiting for a terminal are left out
+        if (!bare()) {
+          const open = new Set(chk.blocks.filter((b) => IO_USE[b.type] && !hasPin(b.p)).map((b) => b.id));
+          chk.blocks = chk.blocks.filter((b) => !open.has(b.id));
+          chk.wires = chk.wires.filter((w) => !open.has(w[0]) && !open.has(w[2]));
+        }
+        const err = new Sim.Engine().load(chk);
         if (err) throw new Error(err);
         editor.checkpoint();
         editor.setProgram(Object.assign(Api.EMPTY(), p), true);
@@ -654,12 +777,110 @@
     });
   }
 
+  // ------------------------------------------------------------ board profile (Settings → Board)
+  // Profiles may come from files: everything here is rendered as text nodes, never as HTML.
+  let boardPick = null;  // profile shown in the card (not applied yet)
+  function loadCustomBoards() {
+    try { customBoards = (JSON.parse(store.get('eos.boards.custom') || '[]') || []).filter((x) => !Boards.validate(x) && !Boards.isBare(x)); } catch { customBoards = []; }
+  }
+  function boardChoices() {
+    const list = Boards.PRESETS.map((x) => ({ prof: x, custom: false }));
+    for (const x of customBoards) if (!list.some((c) => sameProfile(c.prof, x))) list.push({ prof: x, custom: true });
+    if (!list.some((c) => sameProfile(c.prof, board))) list.push({ prof: board, custom: true });  // set on the board from elsewhere
+    return list;
+  }
+  function renderBoardCard() {
+    const sel = $('#boardSel');
+    const list = boardChoices();
+    if (!boardPick || !list.some((c) => sameProfile(c.prof, boardPick))) boardPick = board;
+    sel.textContent = '';
+    list.forEach((c, i) => sel.append(h('option', { value: i, selected: sameProfile(c.prof, boardPick) },
+      c.prof.name + (c.prof.rev ? ' rev ' + c.prof.rev : '') + (c.custom ? ' (custom)' : '') + (sameProfile(c.prof, board) ? ' – active' : ''))));
+    sel.onchange = () => { boardPick = list[Number(sel.value)].prof; renderBoardView(); };
+    renderBoardView();
+  }
+  function renderBoardView() {
+    const box = $('#boardView'), p = boardPick;
+    box.textContent = '';
+    $('#btnBoardApply').disabled = sameProfile(p, board);
+    if (Boards.isBare(p)) {
+      box.append(h('p', { class: 'muted small' }, 'Any usable GPIO, as on an ESP32 dev board. I²C pins come from the Network settings, DS18B20 sensors can use any output-capable pin.'));
+      return;
+    }
+    const i2c = Boards.i2cOf(p), ow = p.onewire || [];
+    box.append(h('p', { class: 'muted small' }, 'Id ' + p.id + ' · I²C: ' + (i2c ? 'SDA GPIO ' + i2c.sda + ', SCL GPIO ' + i2c.scl : 'none') + ' · 1-Wire: ' + (ow.length ? ow.map((g) => 'GPIO ' + g).join(', ') : 'none')));
+    const active = (t) => (t.active ? 'active-' + t.active : '');
+    box.append(h('div', { class: 'tablewrap' }, h('table', { class: 'terms' },
+      h('thead', {}, h('tr', {}, ['Terminal', 'GPIO', 'Use', 'Level', 'Group', 'Note'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, p.terminals.map((t) => h('tr', {}, h('td', {}, h('b', {}, t.label)), h('td', {}, t.gpio),
+        h('td', {}, t.uses.map((u) => Boards.USE_NAME[u]).join(', ')), h('td', {}, active(t)), h('td', {}, t.group || ''), h('td', {}, t.note || '')))))));
+  }
+  async function applyBoard() {
+    const p = boardPick;
+    if (sameProfile(p, board)) return;
+    const ans = await choose('Use ' + p.name + '?', 'The board restarts with this profile. The program stays stopped until you deploy it again.',
+      [['go', 'Apply', 'primary'], ['cancel', 'Cancel']]);
+    if (ans !== 'go') return;
+    const r = await be.setBoard(Boards.isBare(p) ? { id: 'bare' } : p).catch((x) => ({ ok: false, err: x.message }));
+    if (!r || !r.ok) return toast('Not applied: ' + ((r && r.err) || 'no answer'), true);
+    board = Boards.isBare(p) ? Boards.BARE : p;
+    boardChanged();
+    toast(be.kind === 'sim' ? 'Board profile set. Deploy the program to run it on this board.' : 'Board profile saved. The board restarts…');
+    setTimeout(loadSettings, be.kind === 'sim' ? 0 : 6000);
+  }
+  // Everything that shows pins depends on the board.
+  function boardChanged() {
+    liveKey = '';
+    editor.render();
+    renderProps(editor.sel && editor.sel.kind === 'block' ? editor.block(editor.sel.id) : null);
+    renderLive();
+    renderDevices();
+    renderBoardCard();
+  }
+  async function loadBoard() {
+    let r = null;
+    try { r = await be.getBoard(); } catch { /* older firmware: no profiles */ }
+    if (r && r.id === '?') { board = Boards.BARE; return; }  // locked; refreshInfo shows boardError
+    const bad = r && typeof r.id === 'string' ? Boards.validate(r) : 'no profile';
+    if (bad && r && r.id) console.warn('Board profile from the board not understood:', bad);
+    board = !bad && !Boards.isBare(r) ? r : Boards.BARE;
+  }
+  function initBoardCard() {
+    loadCustomBoards();
+    $('#btnBoardApply').addEventListener('click', applyBoard);
+    $('#btnBoardExport').addEventListener('click', () => {
+      const p = Boards.isBare(boardPick) ? { schema: 1, ...Boards.BARE } : boardPick;
+      download(new Blob([JSON.stringify(p, null, 1)], { type: 'application/json' }), 'board-' + p.id + '.json');
+    });
+    $('#fileBoard').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; e.target.value = '';
+      if (!file) return;
+      let p;
+      try { p = JSON.parse(await file.text()); } catch (x) { return toast('Not a JSON file: ' + x.message, true); }
+      const err = Boards.validate(p);
+      if (err) return toast('Not a usable board profile: ' + err, true);
+      if (!Boards.isBare(p)) {
+        customBoards = customBoards.filter((x) => x.id !== p.id).concat([p]);
+        store.set('eos.boards.custom', JSON.stringify(customBoards));
+      }
+      boardPick = Boards.isBare(p) ? Boards.BARE : p;
+      renderBoardCard();
+      toast('Profile loaded. Check the terminals, then press Apply.');
+    });
+  }
+  function showBoardError(err) {
+    const bn = $('#boardBanner');
+    bn.hidden = !err;
+    bn.textContent = '';
+    if (err) bn.append(h('b', {}, 'Board profile problem. '), String(err), ' No program runs until the board is chosen again under Settings → Board.');
+  }
+
   // ------------------------------------------------------------ boot
   async function boot() {
     initTabs();
     initPalette();
     editor = new Editor($('#canvas'), {
-      summary, onBlockClick,
+      summary, onBlockClick, initBlock,
       onSelect: (b) => { renderProps(b); if (b) showSide('props'); },
       onChange,
       onWireRejected: (t) => toast(t === 'a' ? 'Analog values cannot drive a digital input directly. Use a Compare or Threshold block in between.' : 'Incompatible ports', true),
@@ -668,6 +889,7 @@
     });
     initDevices();
     initSettings();
+    initBoardCard();
     $('#btnNewSheet').onclick = newSheet;
     $('#btnRestore').onclick = restoreDeployed;
     $('#btnUndo').onclick = () => editor.undo();
@@ -701,6 +923,7 @@
       if (c && Number.isInteger(c.sda)) i2cBus = { sda: c.sda, scl: c.scl };
       mqttCfg = (c && c.mqtt) || null;
     } catch { /* keep defaults */ }
+    await loadBoard();
 
     let prog;
     try { prog = await be.getProgram(); } catch { prog = Api.EMPTY(); }

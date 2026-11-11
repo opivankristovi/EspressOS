@@ -25,6 +25,7 @@
 static const char* kProgramFile = "/program.json";
 static const char* kConfigFile = "/config.json";
 static const char* kRunFlagFile = "/run.flag";
+static const char* kBoardFile = "/board.json";  // absent = bare ESP32 (chip rules only)
 static constexpr size_t kMaxBody = 64 * 1024;
 static constexpr uint32_t kApFallbackMs = 120000;  // keep trying the router this long before opening the setup AP
 static constexpr uint32_t kStaRetryMs = 30000;
@@ -41,6 +42,8 @@ struct Config {
 
 static Config cfg;
 static EspHal hal;
+static eos::BoardProfile board;
+static String boardError;  // stored profile unreadable: board is locked until one is chosen again
 static eos::Engine engine(hal);
 static SemaphoreHandle_t engineLock;
 static String lastError;
@@ -191,6 +194,39 @@ static void noteLogin(AsyncWebServerRequest* r, bool ok) {
 // ------------------------------------------------------------------ config
 static bool validI2cPins(int sda, int scl) { return EspHal::outputCapable(sda) && EspHal::outputCapable(scl) && sda != scl; }
 
+// A board profile (or a locked board) owns the I2C pins; bare boards use Settings.
+static bool i2cFixed() { return !board.bare() || boardError.length(); }
+static int i2cSda() { return boardError.length() ? -1 : board.bare() ? cfg.sda : board.sda(); }
+static int i2cScl() { return boardError.length() ? -1 : board.bare() ? cfg.scl : board.scl(); }
+
+// ------------------------------------------------------------------ board profile
+// Read at boot only: pins and the I2C bus are set up once. An unreadable profile
+// never falls back to bare (a program for other wiring could drive the wrong
+// pins): the board stays locked until a profile is chosen again.
+static void loadBoard() {
+  board.setBare();
+  boardError = "";
+  if (!fileOrBackupExists(kBoardFile)) return;
+  std::string err, errBak;
+  String text = readFile(kBoardFile), bak = readFile((String(kBoardFile) + ".bak").c_str());
+  if (text.length() && board.parse(text.c_str(), err, EspHal::chipRules())) return;
+  if (bak.length() && board.parse(bak.c_str(), errBak, EspHal::chipRules())) {
+    Serial.printf("%s damaged, using its backup\n", kBoardFile);
+    return;
+  }
+  if (err.empty()) err = errBak.empty() ? "file is empty" : errBak;
+  boardError = String("Board profile is unreadable: ") + err.c_str() + ". Choose the board again in Settings \xE2\x86\x92 Board.";
+  Serial.println(boardError);
+}
+
+static bool removeBoardFiles() {
+  for (const char* suffix : {"", ".bak", ".tmp"}) {
+    String f = String(kBoardFile) + suffix;
+    if (LittleFS.exists(f) && !LittleFS.remove(f)) return false;
+  }
+  return true;
+}
+
 static void loadConfig() {
   JsonDocument d;
   String text = readJsonFile(kConfigFile);
@@ -279,21 +315,55 @@ static bool readMqttSettings(JsonObjectConst m, Mqtt::Settings& s, String& why) 
 }
 
 // ------------------------------------------------------------------ engine
+// A block parameter read the way the engine reads it (number, bool or numeric string).
+static float numParam(JsonVariantConst v, float def) {
+  if (v.is<float>()) return v.as<float>();
+  if (v.is<const char*>()) return (float)atof(v.as<const char*>());
+  if (v.is<bool>()) return v.as<bool>() ? 1.f : 0.f;
+  return def;
+}
+
 // Validates + loads a program into the engine and the sensor manager.
 static bool deploy(const char* json, String& err) {
   JsonDocument doc;
   if (DeserializationError e = deserializeJson(doc, json)) { err = String("JSON: ") + e.c_str(); return false; }
+  if (boardError.length()) { err = boardError; return false; }
+  // A program stamped for other wiring must not drive these pins (absent stamp = bare).
+  const char* stamp = doc["board"].is<const char*>() ? doc["board"].as<const char*>() : "bare";
+  if (strcmp(stamp, board.id()) != 0) {
+    err = String("Program was made for board \"") + stamp + "\" but this board is set to \"" + board.id() +
+          "\". Open it in the editor and use Retarget, then Deploy.";
+    return false;
+  }
   JsonArrayConst devs = doc["devices"].as<JsonArrayConst>();
   if (!Sensors::validate(devs, err)) return false;
-  if (Sensors::usesI2c(devs)) {
-    for (JsonObjectConst b : doc["blocks"].as<JsonArrayConst>()) {
-      int pin = b["p"]["pin"] | -1;
-      const char* t = b["type"] | "";
-      bool io = !strcmp(t, "DI") || !strcmp(t, "DO") || !strcmp(t, "AI") || !strcmp(t, "AO");
-      if (io && (pin == cfg.sda || pin == cfg.scl)) {
-        err = "Block " + String((int)(b["id"] | 0)) + ": GPIO " + String(pin) + " is the I2C bus (SDA " + String(cfg.sda) + ", SCL " + String(cfg.scl) + ")";
+  bool i2cBusy = Sensors::usesI2c(devs);
+  int sda = i2cSda(), scl = i2cScl();
+  for (JsonObjectConst b : doc["blocks"].as<JsonArrayConst>()) {
+    const char* t = b["type"] | "";
+    bool di = !strcmp(t, "DI"), dout = !strcmp(t, "DO");
+    if (!di && !dout && strcmp(t, "AI") && strcmp(t, "AO")) continue;
+    JsonObjectConst p = b["p"];
+    int pin = (int)numParam(p["pin"], -1);
+    String where = "Block " + String((int)(b["id"] | 0)) + ": GPIO " + String(pin);
+    // With a profile the bus pins are never I/O; bare keeps the old rule (only while an I2C sensor exists).
+    if (board.reservedBus(pin)) {
+      err = where + (pin == sda || pin == scl ? " is the I2C bus on this board" : " is a 1-Wire pin on this board");
+      return false;
+    }
+    if (board.bare() && i2cBusy && (pin == sda || pin == scl)) {
+      err = where + " is the I2C bus (SDA " + String(sda) + ", SCL " + String(scl) + ")";
+      return false;
+    }
+    for (JsonObjectConst d : devs)
+      if (!strcmp(d["driver"] | "", "DS18B20") && (d["pin"] | -1) == pin) {
+        err = where + " is the data pin of DS18B20 sensor " + String((int)(d["id"] | 0));
         return false;
       }
+    int fixed = board.fixedInv(pin);
+    if ((di || dout) && fixed >= 0 && (numParam(p["inv"], 0) != 0) != (fixed == 1)) {
+      err = where + " is active-" + (fixed ? "low" : "high") + " on this board: set Invert to " + (fixed ? "on" : "off");
+      return false;
     }
   }
   // Engine and sensors are swapped together while the scan task is held off,
@@ -533,7 +603,7 @@ struct Ota {
   bool wasRunning = false;
   bool ok = false;
   AsyncWebServerRequest* req = nullptr;
-  String keepProgram, keepConfig, keepRunFlag;
+  String keepProgram, keepConfig, keepRunFlag, keepBoard;
   String err;  // why the last upload was refused
 };
 static Ota ota;
@@ -545,7 +615,8 @@ static void otaFinish(bool ok) {
     if (ota.keepConfig.length()) writeFile(kConfigFile, ota.keepConfig.c_str(), ota.keepConfig.length());
     if (ota.keepProgram.length()) writeFile(kProgramFile, ota.keepProgram.c_str(), ota.keepProgram.length());
     if (ota.keepRunFlag.length()) writeFile(kRunFlagFile, ota.keepRunFlag.c_str(), ota.keepRunFlag.length());
-    ota.keepProgram = ota.keepConfig = ota.keepRunFlag = String();
+    if (ota.keepBoard.length()) writeFile(kBoardFile, ota.keepBoard.c_str(), ota.keepBoard.length());
+    ota.keepProgram = ota.keepConfig = ota.keepRunFlag = ota.keepBoard = String();
   }
   // A failed update, or a web-UI-only update, resumes the program.
   if (ota.wasRunning && (!ok || ota.fs)) engineSetRunning(true);
@@ -578,6 +649,9 @@ static void otaUpload(AsyncWebServerRequest* r, const String&, size_t index, uin
       ota.keepProgram = readFile(kProgramFile);
       ota.keepConfig = readFile(kConfigFile);
       ota.keepRunFlag = readFile(kRunFlagFile);
+      // Kept byte for byte, even if damaged: losing it would turn the board bare silently.
+      ota.keepBoard = readFile(kBoardFile);
+      if (ota.keepBoard.isEmpty()) ota.keepBoard = readFile((String(kBoardFile) + ".bak").c_str());
       LittleFS.end();
     }
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, ota.fs ? U_SPIFFS : U_FLASH)) {
@@ -648,6 +722,10 @@ static void setupRoutes() {
     d["cycles"] = engine.cycles();
     xSemaphoreGive(engineLock);
     d["error"] = lastError;
+    JsonObject bd = d["board"].to<JsonObject>();
+    bd["id"] = boardError.length() ? "?" : board.id();
+    bd["name"] = boardError.length() ? "" : board.name();
+    d["boardError"] = boardError;
     d["mqtt"] = Mqtt::statusText();
     time_t now = time(nullptr);
     d["timeSynced"] = now > 1700000000;
@@ -715,8 +793,9 @@ static void setupRoutes() {
     d["ssid"] = cfg.ssid;
     d["host"] = cfg.host;
     d["tz"] = cfg.tz;
-    d["sda"] = cfg.sda;
-    d["scl"] = cfg.scl;
+    d["sda"] = i2cSda();  // effective pins (-1 when the board has no I2C bus)
+    d["scl"] = i2cScl();
+    if (i2cFixed()) d["i2cFixed"] = true;
     d["hasAdminPass"] = !setupMode();
     d["apKey"] = setupMode() ? "" : cfg.apKey;  // only ever sent to a logged-in admin
     JsonObject m = d["mqtt"].to<JsonObject>();
@@ -742,9 +821,16 @@ static void setupRoutes() {
         const char* newPass = d["adminPass"].is<const char*>() ? d["adminPass"].as<const char*>() : nullptr;
         if (setupMode() && !newPass) return sendResult(r, false, "Choose an admin password first");
         if (newPass && strlen(newPass) < 8) return sendResult(r, false, "Admin password needs at least 8 characters");
-        int sda = d["sda"].is<int>() ? d["sda"].as<int>() : cfg.sda;
-        int scl = d["scl"].is<int>() ? d["scl"].as<int>() : cfg.scl;
-        if (!validI2cPins(sda, scl)) return sendResult(r, false, "I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)");
+        int sda = cfg.sda, scl = cfg.scl;
+        if (i2cFixed()) {
+          // Sending the effective pins back unchanged is fine; changing them is not.
+          if ((d["sda"].is<int>() && d["sda"].as<int>() != i2cSda()) || (d["scl"].is<int>() && d["scl"].as<int>() != i2cScl()))
+            return sendResult(r, false, "The I2C pins are fixed by the board profile");
+        } else {
+          if (d["sda"].is<int>()) sda = d["sda"].as<int>();
+          if (d["scl"].is<int>()) scl = d["scl"].as<int>();
+          if (!validI2cPins(sda, scl)) return sendResult(r, false, "I2C pins must be two different output-capable GPIOs (not 6-11 or 34-39)");
+        }
         Mqtt::Settings mq = cfg.mqtt;
         bool mqttChanged = d["mqtt"].is<JsonObjectConst>();
         if (mqttChanged) {
@@ -768,6 +854,42 @@ static void setupRoutes() {
         if (mqttChanged) Mqtt::configure(cfg.mqtt);  // reconnects right away
         if (!saveConfig()) return sendResult(r, false, "Could not save the settings to flash");
         sendResult(r, true, "");
+      },
+      nullptr, collectBody);
+
+  server.on("/api/board", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (boardError.length()) {
+      JsonDocument d;
+      d["id"] = "?";
+      d["error"] = boardError;
+      String s;
+      serializeJson(d, s);
+      return sendJson(r, 200, s);
+    }
+    String s = board.bare() ? String() : readJsonFile(kBoardFile);
+    sendJson(r, 200, s.length() ? s : String("{\"schema\":1,\"id\":\"bare\",\"name\":\"") + board.name() + "\"}");
+  });
+
+  // Pins and the I2C bus are only set up at boot, so a new profile means a restart.
+  // The stored program keeps its old stamp and stays stopped until redeployed.
+  server.on(
+      "/api/board", HTTP_POST,
+      [](AsyncWebServerRequest* r) {
+        const char* b = body(r);
+        if (!b) return sendResult(r, false, "Empty, chunked or too large body");
+        if (strlen(b) > eos::BoardProfile::kMaxJson) return sendResult(r, false, "Board profile is larger than 4096 bytes");
+        eos::BoardProfile next;
+        std::string perr;
+        if (!next.parse(b, perr, EspHal::chipRules())) return sendResult(r, false, perr.c_str());
+        bool wasRunning = engineRunning();
+        engineSetRunning(false);  // outputs to their safe state before the wiring changes
+        bool saved = next.bare() ? removeBoardFiles() : writeFile(kBoardFile, b, strlen(b));
+        if (!saved) {
+          if (wasRunning) engineSetRunning(true);
+          return sendResult(r, false, "Could not save the board profile to flash");
+        }
+        sendResult(r, true, "");
+        xTaskCreate([](void*) { delay(800); ESP.restart(); }, "reboot", 2048, nullptr, 1, nullptr);
       },
       nullptr, collectBody);
 
@@ -806,11 +928,16 @@ void setup() {
   if (!setupMode() && !configLocked && cfg.apKey.isEmpty()) { cfg.apKey = randomKey(12); migrate = true; }  // boards set up before AP keys
   if (migrate) saveConfig();
   engineLock = xSemaphoreCreateMutex();
-  Sensors::begin(cfg.sda, cfg.scl);
+  loadBoard();  // before the I2C bus and the stored program: both depend on it
+  hal.board = &board;
+  Sensors::begin(i2cSda(), i2cScl(), &board);
   Mqtt::begin(&hal, cfg.host, cfg.mqtt);  // before deploy(): programs register their topics
 
   String prog = readJsonFile(kProgramFile);
-  if (prog.length()) {
+  if (prog.length() && boardError.length()) {
+    lastError = "Stored program not started: " + boardError;  // never run it on unknown wiring
+    Serial.println(lastError);
+  } else if (prog.length()) {
     String err;
     if (!deploy(prog.c_str(), err)) {
       lastError = "Stored program: " + err;

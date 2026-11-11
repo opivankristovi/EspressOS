@@ -5,7 +5,7 @@
   "license": "MIT",
   "description": "LOGO!-style block logic controller for the ESP32, programmed from its own web page",
   "scripts": {
-    "test": "node --test tools/test_sim.js tools/test_plcopen.js",
+    "test": "node --test tools/test_sim.js tools/test_plcopen.js tools/test_boards.js",
     "mock": "node tools/mock_server.js 8080",
     "build:web": "python tools/build_web.py"
   }

@@ -1,0 +1,194 @@
+// Board profiles: which ESP32 pins a carrier board brings out to terminals, and how.
+// A profile only NAMES and NARROWS the chip's pins; programs keep raw GPIO numbers.
+// Keep validate() in step with firmware/lib/engine/src/Board.cpp: both must give the
+// same accept/reject answer for every case in tools/board_vectors.json.
+(function (root) {
+  'use strict';
+  const Cat = typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.Catalog;
+
+  const USES = ['di', 'do', 'ai', 'pwm'];
+  const USE_NAME = { di: 'digital in', do: 'digital out', ai: 'analog in', pwm: 'PWM out' };
+  // Relays must not sit here: these pins pulse or are sampled at reset (relays chatter or the board won't boot).
+  const BOOT_PINS = [0, 2, 5, 12, 14, 15];
+  const MAX_BYTES = 4096, MAX_TERMINALS = 40;
+  const BARE = { id: 'bare', name: 'Bare ESP32 dev board' };
+
+  const t = (label, gpio, uses, group, note, extra) => Object.assign({ label, gpio, uses }, extra, group ? { group } : {}, note ? { note } : {});
+  const relay = (n, gpio, note) => t('R' + n, gpio, ['do'], 'Relays', note, { active: 'high' });
+  const io = (n, gpio) => t('IO' + n, gpio, ['di', 'do', 'pwm'], 'GPIO');
+  const opto = (n, gpio) => t('DI' + n, gpio, ['di'], 'Inputs', '12-24 V opto', { active: 'low', pull: false });
+
+  const PRESETS = [
+    BARE,
+    { schema: 1, id: 'eos-mb1', name: 'MB-1 Analog + 4 SSR', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
+      terminals: [
+        t('AI1', 36, ['ai', 'di'], 'Analog in', '0-3.3 V, divider on board'),
+        ...[39, 34, 35, 32, 33].map((g, i) => t('AI' + (i + 2), g, ['ai', 'di'], 'Analog in')),
+        relay(1, 16, 'G3MB-202P SSR, AC loads 0.1-2 A'), relay(2, 17), relay(3, 18), relay(4, 19),
+        io(1, 23), io(2, 25), io(3, 26), io(4, 27), io(5, 13),
+        t('IO6', 14, ['di'], 'GPIO', 'input only: pulses at boot'),
+      ] },
+    { schema: 1, id: 'eos-mb2', name: 'MB-2 8 DI + 4 relay', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
+      terminals: [
+        ...[36, 39, 34, 35, 13, 14, 27, 26].map((g, i) => opto(i + 1, g)),
+        t('AI1', 32, ['ai'], 'Analog in', '0-10 V / 4-20 mA jumper'),
+        t('AI2', 33, ['ai'], 'Analog in', '0-10 V / 4-20 mA jumper'),
+        relay(1, 16), relay(2, 17), relay(3, 18), relay(4, 19),
+        t('Q1', 23, ['do', 'pwm'], 'DC outputs', 'MOSFET, 24 V DC 0.5 A'),
+        t('Q2', 25, ['do', 'pwm'], 'DC outputs', 'MOSFET, 24 V DC 0.5 A'),
+      ] },
+  ];
+
+  // Byte lengths, as the firmware measures them (strlen / serialized size).
+  const bytes = (s) => new TextEncoder().encode(s).length;
+  const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+  const str = (x, min, max) => typeof x === 'string' && bytes(x) >= min && bytes(x) <= max;
+  const given = (x) => x !== undefined && x !== null;  // JSON null counts as absent (ArduinoJson isNull)
+
+  // null when the profile is usable, else the reason. Never trims or repairs a profile.
+  function validate(p) {
+    if (!isObj(p)) return 'A board profile must be a JSON object';
+    let size;
+    try { size = bytes(JSON.stringify(p)); } catch { return 'Not valid JSON'; }
+    if (size > MAX_BYTES) return 'Profile is too large (' + size + ' bytes, max ' + MAX_BYTES + ')';
+    if (p.id === 'bare') {
+      if (given(p.terminals) || given(p.i2c) || given(p.onewire)) return 'The id "bare" is reserved for "no profile" and cannot have terminals or buses';
+      if (given(p.schema) && p.schema !== 1) return 'Unknown profile schema (expected 1)';
+      return null;
+    }
+    if (p.schema !== 1) return 'Unknown profile schema (expected "schema": 1)';
+    if (typeof p.id !== 'string' || !/^[a-z0-9-]{1,24}$/.test(p.id)) return 'Profile id must be 1-24 characters a-z, 0-9 or -';
+    if (!str(p.name, 1, 40)) return 'Profile name must be 1-40 characters';
+    if (given(p.rev) && !str(p.rev, 0, 8)) return 'Profile rev must be at most 8 characters';
+    const owner = new Map();  // gpio -> what uses it, to catch double use
+    const claim = (g, what) => {
+      if (owner.has(g)) return 'GPIO ' + g + ' is used twice (' + owner.get(g) + ' and ' + what + ')';
+      owner.set(g, what); return null;
+    };
+    const outPin = (g) => Number.isInteger(g) && Cat.OUT_PINS.includes(g);
+    if (given(p.i2c)) {
+      if (!isObj(p.i2c)) return 'i2c must be {"sda": n, "scl": n} or null';
+      const { sda, scl } = p.i2c;
+      if (!outPin(sda) || !outPin(scl)) return 'I2C SDA and SCL must be output-capable GPIOs';
+      if (sda === scl) return 'I2C SDA and SCL must be different pins';
+      const e = claim(sda, 'I2C SDA') || claim(scl, 'I2C SCL');
+      if (e) return e;
+    }
+    if (given(p.onewire)) {
+      if (!Array.isArray(p.onewire)) return 'onewire must be a list of GPIOs';
+      for (const g of p.onewire) {
+        if (!outPin(g)) return '1-Wire pins must be output-capable GPIOs (' + g + ' is not)';
+        const e = claim(g, '1-Wire');
+        if (e) return e;
+      }
+    }
+    if (!Array.isArray(p.terminals)) return 'terminals must be a list';
+    if (p.terminals.length > MAX_TERMINALS) return 'At most ' + MAX_TERMINALS + ' terminals';
+    const labels = new Set();
+    for (const x of p.terminals) {
+      if (!isObj(x)) return 'Each terminal must be an object';
+      const L = x.label;
+      if (typeof L !== 'string' || !/^[A-Za-z0-9_.-]{1,8}$/.test(L)) return 'Terminal label ' + JSON.stringify(L) + ': 1-8 characters A-Z, a-z, 0-9, _ . -';
+      if (labels.has(L)) return 'Terminal label ' + L + ' is used twice';
+      labels.add(L);
+      const g = x.gpio;
+      if (!Number.isInteger(g) || !Cat.IN_PINS.includes(g)) return L + ': GPIO ' + g + ' cannot be used (flash, serial or boot pin, or not a GPIO)';
+      if (!Array.isArray(x.uses) || !x.uses.length) return L + ': "uses" must list at least one of di, do, ai, pwm';
+      for (const u of x.uses) if (!USES.includes(u)) return L + ': unknown use ' + JSON.stringify(u);
+      if (new Set(x.uses).size !== x.uses.length) return L + ': a use is listed twice';
+      if ((x.uses.includes('do') || x.uses.includes('pwm')) && !Cat.OUT_PINS.includes(g)) return L + ': GPIO ' + g + ' is input-only';
+      if (x.uses.includes('ai') && !Cat.ADC_PINS.includes(g)) return L + ': GPIO ' + g + ' has no usable ADC (ADC1: 32-36, 39)';
+      if (given(x.active)) {
+        if (x.active !== 'high' && x.active !== 'low') return L + ': active must be "high" or "low"';
+        if (x.uses.some((u) => u !== 'di' && u !== 'do')) return L + ': a fixed active level only fits di/do terminals';
+        if (x.uses.includes('do') && BOOT_PINS.includes(g)) return L + ': GPIO ' + g + ' pulses or is sampled at reset, so a relay there would chatter or stop the board from booting';
+      }
+      if (given(x.pull) && typeof x.pull !== 'boolean') return L + ': pull must be true or false';
+      if (given(x.group) && !str(x.group, 0, 24)) return L + ': group must be at most 24 characters';
+      if (given(x.note) && !str(x.note, 0, 48)) return L + ': note must be at most 48 characters';
+      const e = claim(g, 'terminal ' + L);
+      if (e) return e;
+    }
+    return null;
+  }
+
+  const isBare = (p) => !p || p.id === 'bare';
+  const idOf = (p) => (isBare(p) ? 'bare' : p.id);
+  const CHIP = { di: () => Cat.IN_PINS, do: () => Cat.OUT_PINS, ai: () => Cat.ADC_PINS, pwm: () => Cat.OUT_PINS };
+
+  function pinsFor(p, use) {
+    if (isBare(p)) return CHIP[use]().slice();
+    return p.terminals.filter((x) => x.uses.includes(use)).map((x) => x.gpio);
+  }
+  const terminalOf = (p, gpio) => (isBare(p) ? null : p.terminals.find((x) => x.gpio === Number(gpio)) || null);
+  function labelOf(p, gpio) { const x = terminalOf(p, gpio); return x ? x.label : 'GPIO ' + gpio; }
+  function fixedInv(p, gpio) { const x = terminalOf(p, gpio); return x && given(x.active) ? (x.active === 'low' ? 1 : 0) : -1; }
+  const oneWirePins = (p) => (isBare(p) ? Cat.OUT_PINS.slice() : (p.onewire || []).slice());
+  // null for bare too: there the pins come from Settings. Use hasI2c() to ask "is there a bus".
+  const i2cOf = (p) => (isBare(p) || !given(p.i2c) ? null : { sda: p.i2c.sda, scl: p.i2c.scl });
+  const hasI2c = (p) => isBare(p) || given(p.i2c);
+  function busOf(p, gpio) {
+    if (isBare(p)) return '';
+    const i = i2cOf(p);
+    if (i && (gpio === i.sda || gpio === i.scl)) return 'I2C';
+    return (p.onewire || []).includes(gpio) ? '1-Wire' : '';
+  }
+
+  // Same message shapes as EspHal::pinProblem's profile part; null = fine (chip rules are checked first by the caller).
+  function pinProblem(p, gpio, use) {
+    if (isBare(p)) return null;
+    const x = terminalOf(p, gpio);
+    if (!x) { const bus = busOf(p, gpio); return bus ? 'is the ' + bus + ' bus on this board' : 'is not wired to a terminal on this board'; }
+    if (!x.uses.includes(use)) return '(' + x.label + ') on this board is ' + x.uses.map((u) => USE_NAME[u]).join(' / ') + ' only';
+    return null;
+  }
+
+  // Moves a program to another board: by terminal label, else same GPIO, else no pin (the user picks one).
+  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  function retarget(prog0, from, to) {
+    const prog = JSON.parse(JSON.stringify(prog0));
+    const notes = [];
+    const fromP = isBare(from) ? null : from;
+    for (const b of prog.blocks || []) {
+      const use = IO_USE[b.type];
+      if (!use) continue;
+      b.p = b.p || {};
+      const had = b.p.pin === undefined || b.p.pin === '' || b.p.pin === null ? null : Number(b.p.pin);
+      const ft = had === null ? null : terminalOf(fromP, had);
+      const byLabel = ft && !isBare(to) ? to.terminals.find((x) => x.label === ft.label && x.uses.includes(use)) : null;
+      const allowed = pinsFor(to, use);
+      let pin = null;
+      if (byLabel) pin = byLabel.gpio;
+      else if (had !== null && allowed.includes(had)) pin = had;
+      const was = had === null ? 'no pin' : labelOf(fromP, had) + (ft ? ' (GPIO ' + had + ')' : '');
+      if (pin === null) {
+        delete b.p.pin;
+        if (had !== null) notes.push(`B${b.id}: ${was} does not exist on ${to.name || idOf(to)}; pick a terminal.`);
+        else notes.push(`B${b.id}: pick a terminal.`);
+      } else {
+        b.p.pin = pin;
+        if (pin !== had) notes.push(`B${b.id}: ${was} → ${labelOf(to, pin)} (GPIO ${pin}).`);
+      }
+      if (pin !== null && (b.type === 'DI' || b.type === 'DO')) {
+        const fi = fixedInv(to, pin);
+        if (fi >= 0 && (Number(b.p.inv) ? 1 : 0) !== fi) { b.p.inv = fi; notes.push(`B${b.id}: Invert ${fi ? 'on' : 'off'}, ${labelOf(to, pin)} is active-${fi ? 'low' : 'high'}.`); }
+        const tt = terminalOf(to, pin);
+        if (b.type === 'DI' && tt && typeof tt.pull === 'boolean' && (Number(b.p.pull) ? 1 : 0) !== (tt.pull ? 1 : 0)) { b.p.pull = tt.pull ? 1 : 0; notes.push(`B${b.id}: internal pull-up ${tt.pull ? 'on' : 'off'} for ${tt.label}.`); }
+      }
+    }
+    const ow = oneWirePins(to);
+    for (const d of prog.devices || []) {
+      if (d.driver === 'DS18B20' && !ow.includes(Number(d.pin))) {
+        if (ow.length) { notes.push(`Sensor ${d.name || d.driver}: 1-Wire data moved from GPIO ${d.pin} to GPIO ${ow[0]}.`); d.pin = ow[0]; }
+        else notes.push(`Sensor ${d.name || d.driver}: ${to.name || idOf(to)} has no 1-Wire pin; remove the sensor.`);
+      } else if (d.driver !== 'DS18B20' && !hasI2c(to)) notes.push(`Sensor ${d.name || d.driver}: ${to.name || idOf(to)} has no I2C bus; remove the sensor.`);
+    }
+    if (isBare(to)) delete prog.board; else prog.board = to.id;  // no stamp = bare, as before profiles existed
+    return { prog, notes };
+  }
+
+  const api = { PRESETS, BARE, USES, USE_NAME, BOOT_PINS, validate, isBare, idOf, pinsFor, terminalOf, labelOf, fixedInv,
+    oneWirePins, i2cOf, hasI2c, busOf, pinProblem, retarget };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Boards = api;
+})(this);

@@ -44,6 +44,8 @@
     getConfig() { return http('GET', '/api/config'); }
     setConfig(c) { return http('POST', '/api/config', c); }
     reboot() { return http('POST', '/api/reboot'); }
+    getBoard() { return http('GET', '/api/board'); }
+    setBoard(profile) { return http('POST', '/api/board', profile); }
     ota(file, onProgress) {
       return new Promise((resolve, reject) => {
         const fd = new FormData();
@@ -113,8 +115,11 @@
       this.t0 = performance.now();
       this.prog = EMPTY();
       try { const s = localStorage.getItem('eos.sim.program'); if (s) this.prog = JSON.parse(s); } catch { /* storage unavailable */ }
-      this._apply(this.prog);
-      this.engine.run();
+      // The simulated board's profile, like /board.json on the device.
+      this.hal.board = root.Boards.BARE;
+      try { const s = localStorage.getItem('eos.sim.board'); const b = s && JSON.parse(s); if (b && !root.Boards.validate(b)) this.hal.board = b; } catch { /* storage unavailable or bad */ }
+      this.error = this._apply(this.prog) || '';  // e.g. stored program made for another board: stays stopped
+      if (!this.error) this.engine.run();
       this._tick = this._tick.bind(this);
       this.timer = setInterval(this._tick, 10);
       setInterval(() => this._emit(), 200);
@@ -148,8 +153,10 @@
     subscribe(cb) { this.listeners.push(cb); cb(this.snapshot()); }
 
     async info() {
+      const b = this.hal.board;
       return { version: 'simulator', uptime: Math.round(this._now() / 1000), ap: false, ip: '-', host: 'simulator', heap: 0,
-        running: this.engine.running, blocks: this.engine.blocks.length, cycleMs: this.engine.cycleMs, cycles: this.engine.cycles, error: '', timeSynced: true };
+        running: this.engine.running, blocks: this.engine.blocks.length, cycleMs: this.engine.cycleMs, cycles: this.engine.cycles, error: this.error || '', timeSynced: true,
+        board: { id: root.Boards.idOf(b), name: b.name || '' }, boardError: '' };
     }
     async getProgram() { return JSON.parse(JSON.stringify(this.prog)); }
     async deploy(prog) {
@@ -157,19 +164,45 @@
       if (err) return { ok: false, err };
       this.prog = JSON.parse(JSON.stringify(prog));
       try { localStorage.setItem('eos.sim.program', JSON.stringify(prog)); } catch { /* ignore */ }
+      this.error = '';
       this.engine.run();
       this._emit();
       return { ok: true };
     }
-    async run() { this.engine.run(); this._emit(); return { ok: true }; }
+    async run() {
+      const err = this.engine.run();
+      this._emit();
+      if (err) { this.error = err; return { ok: false, err }; }
+      return { ok: true };
+    }
     async stop() { this.engine.stop(); this._emit(); return { ok: true }; }
     async setVin(idx, value) { this.vin[idx] = value; this._tick(); this._emit(); return { ok: true }; }
+    _i2c() { const B = root.Boards, b = this.hal.board; return B.isBare(b) ? { sda: 21, scl: 22 } : B.i2cOf(b) || { sda: -1, scl: -1 }; }
     async scanI2C() {
+      const bus = this._i2c();
+      if (bus.sda < 0) return { ...bus, found: [], error: 'This board has no I2C bus' };
       const found = (this.prog.devices || []).filter((d) => d.addr).map((d) => d.addr);
-      return { sda: 21, scl: 22, found: found.length ? found : [0x76, 0x23] };
+      return { ...bus, found: found.length ? found : [0x76, 0x23] };
     }
     async drivers() { return root.Catalog.DRIVERS.map((d) => d.id); }
-    async getConfig() { return { ssid: '', host: 'espressos', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', sda: 21, scl: 22, hasAdminPass: false }; }
+    async getConfig() {
+      const bus = this._i2c();
+      return { ssid: '', host: 'espressos', tz: 'CET-1CEST,M3.5.0,M10.5.0/3', ...bus, i2cFixed: !root.Boards.isBare(this.hal.board), hasAdminPass: false };
+    }
+    async getBoard() { const b = this.hal.board; return root.Boards.isBare(b) ? { schema: 1, ...root.Boards.BARE } : JSON.parse(JSON.stringify(b)); }
+    // Applies at once (the real board reboots): the program stops and only runs again after a deploy for this board.
+    async setBoard(profile) {
+      const err = root.Boards.validate(profile);
+      if (err) return { ok: false, err };
+      this.engine.stop();
+      this.hal.board = root.Boards.isBare(profile) ? root.Boards.BARE : JSON.parse(JSON.stringify(profile));
+      try {
+        if (root.Boards.isBare(profile)) localStorage.removeItem('eos.sim.board');
+        else localStorage.setItem('eos.sim.board', JSON.stringify(profile));
+      } catch { /* ignore */ }
+      this._emit();
+      return { ok: true };
+    }
     // A message on an MQTT topic, as if the broker delivered it. False if the payload is not understood.
     setMqtt(topic, text) {
       const v = root.Sim.parsePayload(text);

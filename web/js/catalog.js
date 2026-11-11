@@ -10,25 +10,26 @@
 
   const d = (n) => ({ n, t: 'd' });
   const a = (n) => ({ n, t: 'a' });
-  const pin = (list, def) => ({ key: 'pin', label: 'GPIO', type: 'select', options: list.map((p) => [p, 'GPIO ' + p]), def });
+  // use: 'di' | 'do' | 'ai' | 'pwm' (board profiles narrow the list by it, see boards.js); options = the bare chip list.
+  const pin = (use, list, def) => ({ key: 'pin', label: 'GPIO', type: 'pin', use, options: list.map((p) => [p, 'GPIO ' + p]), def });
   const num = (key, label, def, unit, step) => ({ key, label, type: 'number', def, unit, step });
   const bool = (key, label, def) => ({ key, label, type: 'bool', def: def ? 1 : 0 });
 
   const BLOCKS = [
     // ---- inputs / outputs
     { type: 'DI', cat: 'io', label: 'Digital input', sym: 'I', ins: [], outs: [d('Q')],
-      params: [pin(IN_PINS, 4), bool('pull', 'Internal pull-up', 1), bool('inv', 'Invert', 0)],
+      params: [pin('di', IN_PINS, 4), bool('pull', 'Internal pull-up', 1), bool('inv', 'Invert', 0)],
       sum: (p) => 'GPIO ' + p.pin + (p.inv ? ' inv' : ''),
       help: 'Reads a GPIO pin. With pull-up enabled, wire a button between the pin and GND and tick Invert.' },
     { type: 'DO', cat: 'io', label: 'Digital output', sym: 'Q', ins: [d('')], outs: [],
-      params: [pin(OUT_PINS, 2), bool('inv', 'Invert (active-low relay)', 0)],
+      params: [pin('do', OUT_PINS, 2), bool('inv', 'Invert (active-low relay)', 0)],
       sum: (p) => 'GPIO ' + p.pin + (p.inv ? ' inv' : ''),
       help: 'Drives a GPIO pin (LED, relay, MOSFET). When the program stops, the pin is released.' },
     { type: 'AI', cat: 'io', label: 'Analog input', sym: 'AI', ins: [], outs: [a('')],
-      params: [pin(ADC_PINS, 34), num('min', 'Value at 0 V', 0), num('max', 'Value at 3.3 V', 100)],
+      params: [pin('ai', ADC_PINS, 34), num('min', 'Value at 0 V', 0), num('max', 'Value at 3.3 V', 100)],
       sum: (p) => 'GPIO ' + p.pin, help: 'ADC reading scaled linearly to min..max. Only ADC1 pins work while Wi-Fi is on.' },
     { type: 'AO', cat: 'io', label: 'PWM output', sym: 'AQ', ins: [a('%')], outs: [],
-      params: [pin(OUT_PINS, 25), num('freq', 'Frequency', 1000, 'Hz')],
+      params: [pin('pwm', OUT_PINS, 25), num('freq', 'Frequency', 1000, 'Hz')],
       sum: (p) => 'GPIO ' + p.pin, help: 'PWM duty cycle 0-100 % (dimming, fans, servo-less motors).' },
     { type: 'VIN', ui: 'VSWITCH', cat: 'io', label: 'Web switch', sym: 'V', ins: [], outs: [d('Q')],
       params: [num('idx', 'Slot (0-15)', 0, '', 1), { key: 'mode', label: 'Type', type: 'select', options: [['switch', 'Toggle switch'], ['button', 'Push button']], def: 'switch' }, { key: 'name', label: 'Label', type: 'text', def: 'Switch' }],

@@ -21,12 +21,28 @@ static bool inList(const int (&list)[N], int pin) {
 
 bool EspHal::outputCapable(int pin) { return inList(kOutPins, pin); }
 bool EspHal::validPin(int pin) { return outputCapable(pin) || inList(kInOnlyPins, pin); }
+bool EspHal::adcCapable(int pin) { return inList(kAdcPins, pin); }
 
 const char* EspHal::pinProblem(int pin, eos::PinUse use) {
   if (!validPin(pin)) return "cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)";
   if ((use == eos::PinUse::DigitalOut || use == eos::PinUse::PwmOut) && !outputCapable(pin)) return "is input-only";
-  if (use == eos::PinUse::AnalogIn && !inList(kAdcPins, pin)) return "has no usable ADC (use 32-36 or 39)";
-  return nullptr;
+  if (use == eos::PinUse::AnalogIn && !adcCapable(pin)) return "has no usable ADC (use 32-36 or 39)";
+  if (!board || board->allows(pin, use)) return nullptr;
+  uint8_t m = board->uses(pin);
+  if (!m) return "is not wired to a terminal on this board";
+  // Only called from Engine::load (under the engine lock), so one buffer is enough.
+  static char why[40];
+  static const char* const kNames[] = {"DI", "DO", "AI", "PWM"};
+  strcpy(why, "is ");
+  bool first = true;
+  for (int i = 0; i < 4; i++)
+    if (m & (1 << i)) {
+      if (!first) strcat(why, "/");
+      strcat(why, kNames[i]);
+      first = false;
+    }
+  strcat(why, " only on this board");
+  return why;
 }
 
 void EspHal::setupInput(int pin, bool pullup) {
@@ -95,7 +111,9 @@ bool EspHal::timeOfDay(int* dow, int* minuteOfDay) {
 }
 
 // Safe state = outputs released to high impedance. This de-energises both
-// active-high and (pulled-up) active-low relay boards.
+// active-high and (pulled-up) active-low relay boards. The driver is switched
+// off before the latch is cleared: clearing first would pull an active-low
+// relay LOW (= on) for a moment.
 void EspHal::safeOutputs() {
   for (int pin = 0; pin < 40; pin++) {
     uint64_t bit = 1ULL << pin;
@@ -107,8 +125,8 @@ void EspHal::safeOutputs() {
 #endif
     }
     if ((outMask_ | pwmMask_) & bit) {
-      digitalWrite(pin, LOW);
       pinMode(pin, INPUT);
+      gpio_set_level((gpio_num_t)pin, 0);
     }
   }
   outMask_ = pwmMask_ = 0;
