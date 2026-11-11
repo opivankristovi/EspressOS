@@ -34,7 +34,9 @@ test('every preset is valid and matches the contract tables', () => {
   assert.deepEqual(mb2.terminals.map((t) => t.label + '=' + t.gpio).join(' '),
     'DI1=36 DI2=39 DI3=34 DI4=35 DI5=13 DI6=14 DI7=27 DI8=26 AI1=32 AI2=33 R1=16 R2=17 R3=18 R4=19 Q1=23 Q2=25');
   assert.deepEqual(mb2.terminals[0], { label: 'DI1', gpio: 36, uses: ['di'], active: 'low', pull: false, group: 'Inputs', note: '12-24 V opto' });
-  assert.deepEqual(mb1.terminals.find((t) => t.label === 'R1'), { label: 'R1', gpio: 16, uses: ['do'], active: 'high', group: 'Relays', note: 'G3MB-202P SSR, AC loads 0.1-2 A' });
+  assert.deepEqual(mb1.terminals.find((t) => t.label === 'R1'), { label: 'R1', gpio: 16, uses: ['do'], active: 'high', group: 'Relays', note: 'Relay COM/NO/NC, 5 A 250 V AC / 30 V DC' });
+  assert.deepEqual(mb1.terminals.find((t) => t.label === 'R3').note, 'G3MB-202P SSR, AC loads 0.1-2 A');
+  assert.ok(mb1.terminals.filter((t) => t.label.startsWith('AI')).every((t) => t.pull === false), 'AI dividers: no internal pull-up');
   for (const p of [mb1, mb2]) { assert.deepEqual(p.i2c, { sda: 21, scl: 22 }); assert.deepEqual(p.onewire, [4]); }
 });
 

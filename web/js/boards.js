@@ -20,11 +20,13 @@
 
   const PRESETS = [
     BARE,
-    { schema: 1, id: 'eos-mb1', name: 'MB-1 Analog + 4 SSR', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
+    // Hardware: hardware/MB-1/README.md. AI terminals have a 30k/10k divider, so the chip's pull-up must stay off.
+    { schema: 1, id: 'eos-mb1', name: 'MB-1 Analog + 2 relay + 2 SSR', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
       terminals: [
-        t('AI1', 36, ['ai', 'di'], 'Analog in', '0-3.3 V, divider on board'),
-        ...[39, 34, 35, 32, 33].map((g, i) => t('AI' + (i + 2), g, ['ai', 'di'], 'Analog in')),
-        relay(1, 16, 'G3MB-202P SSR, AC loads 0.1-2 A'), relay(2, 17), relay(3, 18), relay(4, 19),
+        t('AI1', 36, ['ai', 'di'], 'Analog in', '0-10 V; AI block max = value at 13.2 V', { pull: false }),
+        ...[39, 34, 35, 32, 33].map((g, i) => t('AI' + (i + 2), g, ['ai', 'di'], 'Analog in', '', { pull: false })),
+        relay(1, 16, 'Relay COM/NO/NC, 5 A 250 V AC / 30 V DC'), relay(2, 17),
+        relay(3, 18, 'G3MB-202P SSR, AC loads 0.1-2 A'), relay(4, 19),
         io(1, 23), io(2, 25), io(3, 26), io(4, 27), io(5, 13),
         t('IO6', 14, ['di'], 'GPIO', 'input only: pulses at boot'),
       ] },
