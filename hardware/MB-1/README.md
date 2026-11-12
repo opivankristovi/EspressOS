@@ -1,8 +1,8 @@
 # MB-1: 6 analog in, 2 relays, 2 SSRs (rev A, design)
 
-MB-1 is a DIN-rail carrier board for an ESP32-WROOM-32E module. It is the hardware that the `eos-mb1` board profile in [web/js/boards.js](../../web/js/boards.js) describes. This document is the design: decisions, block diagram, pin map, terminal layout, circuits with values, a netlist to enter in KiCad, a BOM and layout rules.
+MB-1 is a DIN-rail carrier board for an ESP32-WROOM-32E module. It is the hardware that the `eos-mb1` board profile in [web/js/boards.js](../../web/js/boards.js) describes. This document is the design: decisions, block diagram, pin map, terminal layout, circuits with values, the KiCad schematic, a BOM and layout rules.
 
-**Status:** design only. Nothing has been drawn in KiCad, ordered or built yet.
+**Status:** schematic done (generated, netlist-checked). There is no PCB layout yet, and nothing has been ordered or built.
 
 ## Design decisions
 
@@ -141,89 +141,44 @@ Terminal → Rs 30 kΩ 1 % → node → ESP32 pin; node → Rb 10 kΩ 1 % to GND
 - DQ (GPIO 4): R 4.7 kΩ to 3V3. ESD: D (PESD3V3L1BA).
 - F2: PTC 200 mA hold between 3V3 and the "3V3 out" net that feeds every 3V3 terminal position and J5.
 
-## Netlist (KiCad entry)
+## Schematic
 
-Reference designators are as listed; "(n)" repeats per channel. Pin names are the part's datasheet names.
+[MB-1.kicad_sch](MB-1.kicad_sch) is the schematic (KiCad 8 format; it opens in KiCad 8, 9 and 10), and [MB-1.pdf](MB-1.pdf) is a print of it. Open [MB-1.kicad_pro](MB-1.kicad_pro) in KiCad.
 
+**It is generated.** [gen_schematic.py](gen_schematic.py) holds every part, its value, footprint and part number, and the net on each pin. The script copies the symbols from KiCad's own libraries and draws the sheet:
+- six blocks, matching the sections above;
+- net labels at the pins and power symbols for GND, +5V and +3V3;
+- a no-connect flag on every pin that isn't used.
+
+To change the circuit, edit the script and generate again, rather than editing the sheet by hand:
+
+```bash
+python gen_schematic.py
+kicad-cli sch erc MB-1.kicad_sch
+kicad-cli sch export netlist --format kicadsexpr -o MB-1.net MB-1.kicad_sch
+python check_netlist.py MB-1.net
+kicad-cli sch export pdf -o MB-1.pdf MB-1.kicad_sch
 ```
-# Power
-J1 USB-C       VBUS(A4,A9,B4,B9)=VBUS_IN  GND(A1,A12,B1,B12,shield)=GND
-               CC1(A5)=CC1  CC2(B5)=CC2  D+(A6,B6)=USB_DP  D-(A7,B7)=USB_DM
-R1 5k1 1%      CC1 - GND
-R2 5k1 1%      CC2 - GND
-F1 PTC 1.5A    VBUS_IN - 5V
-D1 SMAJ5.0A    5V(K) - GND(A)
-C1 100u/10V    5V - GND
-C2 10u         5V - GND
-U2 AP7361C-33E IN=5V  OUT=3V3  GND=GND
-C3 10u         5V - GND
-C4 22u         3V3 - GND
-C5 100n        3V3 - GND
-R3 1k          3V3 - LED1(A);  LED1 green  K=GND
 
-# USB-serial, auto-reset
-U4 USBLC6-2SC6 I/O1=USB_DP  I/O2=USB_DM  VBUS=5V  GND=GND
-U3 CH340C      UD+=USB_DP  UD-=USB_DM  VCC=3V3  V3=3V3  GND=GND
-               TXD=RXD0  RXD=TXD0  DTR#=DTR  RTS#=RTS
-C6 100n        3V3 - GND (at U3)
-R4 10k         DTR - Q1(B)
-Q1 MMBT3904    E=RTS  C=IO0
-R5 10k         RTS - Q2(B)
-Q2 MMBT3904    E=DTR  C=EN
-R6 10k         EN - 3V3
-C7 1u          EN - GND
-SW1 tact       EN - GND          (RESET)
-R7 10k         IO0 - 3V3
-SW2 tact       IO0 - GND         (BOOT)
+[check_netlist.py](check_netlist.py) compares the netlist KiCad reads from the sheet with the nets in the script, pin by pin. A label that lands on the wrong pin would short or split a net without any ERC error. The current sheet gives 73 nets and 0 differences.
 
-# ESP32
-U1 ESP32-WROOM-32E-N4  3V3=3V3  GND=GND  EN=EN  IO0=IO0  TXD0=TXD0  RXD0=RXD0
-               SENSOR_VP(IO36)=AIN1  SENSOR_VN(IO39)=AIN2  IO34=AIN3  IO35=AIN4  IO32=AIN5  IO33=AIN6
-               IO16=OUT1  IO17=OUT2  IO18=OUT3  IO19=OUT4
-               IO23=GP1  IO25=GP2  IO26=GP3  IO27=GP4  IO13=GP5  IO14=GP6
-               IO21=SDA  IO22=SCL  IO4=DQ
-               IO2, IO5, IO12, IO15, SD0-SD3/CLK/CMD: not connected
-C8 22u, C9 100n, C10 100n   3V3 - GND (at U1)
+**ERC:** the electrical check has one expected error: "power output connected to power output" between U2 VO and U3 V3. The CH340C datasheet ties V3 to VCC when the chip runs at 3.3 V. Exclude it in KiCad's ERC dialog. On a KiCad install whose library tables were never set up, `kicad-cli` also lists "library not in the current configuration" warnings; those go away once KiCad has been started once.
 
-# Outputs, n = 1..4
-Rg(n) 100R      OUTn - Gn
-Rpd(n) 100k     Gn - GND
-Q(n+2) AO3400A  G=Gn  S=GND  D=DRVn          (Q3..Q6)
-LED(n+1) red + Rl(n) 1k   5V - LED(A); LED(K) - Rl - DRVn   (LED2..LED5)
-K1 HF3FF/005-1ZS  coil: 5V - DRV1   contacts: COM=R1_COM NO=R1_NO NC=R1_NC
-K2 HF3FF/005-1ZS  coil: 5V - DRV2   contacts: COM=R2_COM NO=R2_NO NC=R2_NC
-D4, D5 1N4148W  K=5V A=DRV1 / DRV2
-K3 G3MB-202P   +=5V  -=DRV3  load: R3_LF - R3_LOAD
-K4 G3MB-202P   +=5V  -=DRV4  load: R4_LF - R4_LOAD
-F3 2A T TR5    R3_L - R3_LF
-F4 2A T TR5    R4_L - R4_LF
-J2 5.08mm 3p   R1_COM R1_NO R1_NC
-J3 5.08mm 3p   R2_COM R2_NO R2_NC
-J4 5.08mm 4p   R3_L R3_LOAD R4_L R4_LOAD
+**Before the PCB:**
+- *K3/K4 symbol:* KiCad has no Omron G3MB. The sheet uses the Sharp S202S02 symbol, which does the same job: input 3 (+) and 4 (−), output 1 and 2.
+- *K3/K4 footprint:* the footprint is set to `MB-1:Omron_G3MB-202P_SIP4`, a project library that doesn't exist yet. Draw it from Omron's G3MB dimension drawing, and check the pin order there too.
+- *F3/F4:* these use TR5 fuse sockets (Littelfuse 560/460 series), so a blown fuse can be swapped.
 
-# Analog inputs, n = 1..6
-Rs(n) 30k 1%    TAIn - AINn
-Rb(n) 10k 1%    AINn - GND
-Ca(n) 100n      AINn - GND
-Dc(n) BAT54S    1=GND  2=3V3  3=AINn
-J6 3.5mm 8p     TAI1 TAI2 TAI3 TAI4 TAI5 TAI6 GND GND
+Reference designators on the sheet:
 
-# GPIO
-Rio(n) 100R     GPn - TIOn            (n = 1..6)
-U5 TPD4E05U06   TIO1 TIO2 TIO3 TIO4   GND
-U6 TPD4E05U06   TIO5 TIO6 SDA SCL     GND
-J7 3.5mm 8p     TIO1 TIO2 TIO3 TIO4 TIO5 TIO6 3V3_OUT GND
-
-# Buses
-F2 PTC 200mA    3V3 - 3V3_OUT
-R8 4k7          SDA - 3V3
-R9 4k7          SCL - 3V3
-R10 4k7         DQ - 3V3
-D3 PESD3V3L1BA  DQ - GND
-J8 3.5mm 3p     3V3_OUT DQ GND
-J9 3.5mm 4p     3V3_OUT SDA SCL GND
-J5 SM04B-SRSS-TB  1=GND 2=3V3_OUT 3=SDA 4=SCL
-```
+| Function | Refs |
+|---|---|
+| Power | J1, R1–R3, F1, D1, C1–C5, LED1, U2 |
+| USB-serial, reset | U3, U4, Q1, Q2, R4–R7, C6, C7, SW1 (RESET), SW2 (BOOT) |
+| ESP32 | U1, C8–C10 |
+| Outputs (n = 1…4) | gate resistor R11–R14, gate pull-down R15–R18, MOSFET Q3–Q6, LED2–LED5 with R19–R22, relays K1/K2 with flyback D4/D5, SSRs K3/K4 with fuses F3/F4, terminals J2–J4 |
+| Analog in (n = 1…6) | series R23–R28 (30k), to GND R29–R34 (10k), C11–C16, clamp D6–D11, terminal J6 |
+| GPIO, buses | series R35–R40, ESD U5/U6 and D3, I2C pull-ups R8/R9, 1-Wire pull-up R10, PTC F2, terminals J7–J9, Qwiic J5 |
 
 ## BOM (one board)
 
@@ -235,14 +190,14 @@ Manufacturer part numbers are real parts. Look up the LCSC numbers in the JLCPCB
 | U2 | 1 | LDO 3.3 V 1 A, SOT-223 | Diodes AP7361C-33E-13 | |
 | U3 | 1 | USB-serial, SOP-16 | WCH CH340C | powered from 3V3 |
 | U4 | 1 | USB ESD, SOT-23-6 | ST USBLC6-2SC6 | |
-| U5, U6 | 2 | 4-ch ESD, SOT-23-6 | TI TPD4E05U06DQAR (or TPD4E05U06DBVR) | match the footprint |
+| U5, U6 | 2 | 4-ch ESD, USON-10 | TI TPD4E05U06DQAR | |
 | Q1, Q2 | 2 | NPN, SOT-23 | onsemi MMBT3904 | |
 | Q3–Q6 | 4 | N-MOSFET logic level, SOT-23 | AOS AO3400A | |
 | K1, K2 | 2 | Relay SPDT 5 V, 10 A | Hongfa HF3FF/005-1ZS | Songle SRD-05VDC-SL-C fits the same footprint |
 | K3, K4 | 2 | SSR 2 A AC, zero-cross, SIP-4 | Omron G3MB-202P DC5 | |
 | F1 | 1 | PTC 1.5 A hold, 1206/1812 | Bourns MF-MSMF150-2 | |
 | F2 | 1 | PTC 0.2 A hold | Bourns MF-MSMF020-2 | |
-| F3, F4 | 2 | Fuse 2 A time-lag, TR5 | Littelfuse 372 series, 2 A T | with TR5 sockets |
+| F3, F4 | 2 | Fuse 2 A time-lag, TR5, in a TR5 socket | Littelfuse 372 series 2 A T + 560 series socket | |
 | D1 | 1 | TVS 5 V, SMA | Littelfuse SMAJ5.0A | |
 | D3 | 1 | ESD diode for DQ, SOD-323 | Nexperia PESD3V3L1BA | |
 | D4, D5 | 2 | Flyback diodes, SOD-123 | 1N4148W | |

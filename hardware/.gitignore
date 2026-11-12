@@ -1,0 +1,7 @@
+# KiCad and script leftovers
+*.net
+*-backups/
+*.kicad_prl
+fp-info-cache
+__pycache__/
+*.lck
