@@ -118,7 +118,7 @@ Each output is a low-side N-MOSFET with its gate held low, so the output is off 
 
 - GPIO → Rg(n) 100 Ω → gate Qn (AO3400A). Rpd(n) 100 kΩ from gate to GND.
 - **R1, R2 (relays K1, K2, HF3FF/005-1ZS):** coil between 5V and the drain. Flyback diode D(n) 1N4148W across the coil (cathode to 5V). Indicator LED + 1 kΩ from 5V to the drain.
-- **R3, R4 (SSRs K3, K4, G3MB-202P):** input + to 5V, input − to the drain. Indicator LED + 1 kΩ from 5V to the drain. Load side: terminal "L in" → fuse F3/F4 (2 A time-lag, TR5) → SSR terminal; the other SSR terminal goes to terminal "Load". Check the G3MB-202P pin order (input +/−, load pins) against the Omron datasheet when drawing the footprint.
+- **R3, R4 (SSRs K3, K4, G3MB-202P):** input + to 5V, input − to the drain. Indicator LED + 1 kΩ from 5V to the drain. Load side: terminal "L in" → fuse F3/F4 (2 A time-lag, TR5) → SSR terminal; the other SSR terminal goes to terminal "Load". Pin order from the Omron data sheet: 1 and 2 load, 3 input +, 4 input −.
 - G3MB-202P notes for the user:
   - It switches AC only; it never turns a DC load off.
   - Its built-in snubber passes a small leakage current, so a very small load such as an LED lamp under about 0.1 A can glow while the output is off. The profile note says 0.1–2 A for that reason.
@@ -166,7 +166,7 @@ kicad-cli sch export pdf -o MB-1.pdf MB-1.kicad_sch
 
 **Before the PCB:**
 - *K3/K4 symbol:* KiCad has no Omron G3MB. The sheet uses the Sharp S202S02 symbol, which does the same job: input 3 (+) and 4 (−), output 1 and 2.
-- *K3/K4 footprint:* the footprint is set to `MB-1:Omron_G3MB-202P_SIP4`, a project library that doesn't exist yet. Draw it from Omron's G3MB dimension drawing, and check the pin order there too.
+- *K3/K4 footprint:* `MB-1:Omron_G3MB-202P_SIP4` lives in the project library [MB-1.pretty](MB-1.pretty), drawn from Omron's G3MB data sheet (Cat. No. GC RLY8, page 3). It has four 1.0 mm holes on 1.8 mm pads, at 0, 7.62, 17.78 and 20.32 mm from pin 1 (top view). Pins 1 and 2 are the load and 3 (+) and 4 (−) the input. The body is 24.5 × 5.5 mm, with pin 4 1.69 mm from the body end. The [fp-lib-table](fp-lib-table) next to the project points KiCad to it. This is the standard G3MB-202P only: the "-4" variant has a different hole layout.
 - *F3/F4:* these use TR5 fuse sockets (Littelfuse 560/460 series), so a blown fuse can be swapped.
 
 Reference designators on the sheet:

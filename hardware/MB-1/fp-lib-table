@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "MB-1")(type "KiCad")(uri "${KIPRJMOD}/MB-1.pretty")(options "")(descr "MB-1 parts not in the KiCad library"))
+)

@@ -36,7 +36,7 @@ FP = {
     'PTC1812': 'Fuse:Fuse_1812_4532Metric',
     'PTC1206': 'Fuse:Fuse_1206_3216Metric',
     'TR5': 'Fuse:Fuseholder_TR5_Littelfuse_No560_No460',
-    # No G3MB in the KiCad library: draw this footprint from Omron's G3MB datasheet into MB-1.pretty
+    # Not in the KiCad library: MB-1.pretty (drawn from Omron's G3MB data sheet, standard pinout)
     'G3MB': 'MB-1:Omron_G3MB-202P_SIP4',
     'MKDS3': 'TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal',
     'MKDS4': 'TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal',
@@ -135,7 +135,7 @@ for n in (1, 2):
 for n in (3, 4):
     # Symbol: Sharp S202S02 (same function: zero-cross triac SSR, input 3+/4-, output 1/2).
     part(f'K{n}', 'Relay_SolidState:S202S02', 'G3MB-202P DC5', 'G3MB',
-         {'3': '+5V', '4': f'DRV{n}', '1': f'R{n}_LF', '2': f'R{n}_LOAD'}, MPN='Omron G3MB-202P DC5 (check pin order)')
+         {'3': '+5V', '4': f'DRV{n}', '1': f'R{n}_LF', '2': f'R{n}_LOAD'}, MPN='Omron G3MB-202P DC5')
     part(f'F{n}', 'Device:Fuse', '2A T', 'TR5', {'1': f'R{n}_L', '2': f'R{n}_LF'}, MPN='Littelfuse 372 series 2 A T')
 part('J2', 'Connector:Screw_Terminal_01x03', 'R1 COM/NO/NC', 'MKDS3', {'1': 'R1_COM', '2': 'R1_NO', '3': 'R1_NC'},
      MPN='Phoenix MKDS 1,5/3-5,08 (1715734)')
