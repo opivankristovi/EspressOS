@@ -2,7 +2,7 @@
 
 MB-2 is a carrier board for a plugged-in **ESP32 DOIT DevKit V1 (30-pin)**. It is the hardware that the `eos-mb2` board profile in [web/js/boards.js](../../web/js/boards.js) describes. Where MB-1 is a controller with mains outputs, MB-2 is a monitoring node: precise analog inputs, capacitive touch, sensor buses, and a header that drives an external relay module. There is no mains voltage on MB-2.
 
-**Status:** design agreed; the `eos-mb2` profile and the firmware's touch support are in place; schematic done (generated, netlist-checked, ERC clean). No PCB or order yet.
+**Status:** design agreed; the `eos-mb2` profile and the firmware's touch support are in place; schematic done (generated, netlist-checked, ERC clean); PCB placed and routed (generated, DRC: no errors); Gerbers and a 3D model for the enclosure. Nothing ordered or built yet.
 
 ## Design decisions
 
@@ -134,12 +134,73 @@ Reference designators on the sheet:
 |Relay header|gate R23–R26, pull-down R27–R30, MOSFETs Q1–Q4, header J8|
 |GPIO, buses|R31–R33, pull-ups R34–R36, terminals J9 (IO), J10 (I2C), J12 (1-Wire), Qwiic J11|
 
-## Layout
+## PCB
 
-* Board 120 × 80 mm, two layers, four M3 holes in the corners.
-* DevKit socket in the middle-right with the module's antenna end over the board edge (or a copper-free area under it).
-* Analog front ends close to the ADS1115 socket; touch wiring as short as possible and away from the relay header and the regulator.
-* One solid GND pour on both layers.
+[MB-2.kicad\_pcb](MB-2.kicad_pcb): two layers, 120 × 80 mm, four M3 holes, all parts on top. Renders: [top](MB-2-top.png), [bottom](MB-2-bottom.png). Generated and routed by script, like MB-1:
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" gen_pcb.py
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" route.py
+kicad-cli pcb drc MB-2.kicad_pcb
+```
+
+* **[gen\_pcb.py](gen_pcb.py)** reads the parts and nets from `gen_schematic.py`, places every footprint and writes the outline, holes, ground pours on both layers, silkscreen and net classes. `gen_pcb.py --silk` redoes only the part fields and silkscreen on a routed board.
+* **[route.py](route.py)** is MB-1's: Freerouting (about a minute on this board), then loose vias and stubs removed, ground stitching vias, islands joined, and any track Freerouting necked below the 0.2 mm minimum widened back.
+
+**Layout.**
+* **Top edge:** the analog (J5), input (J6) and touch (J7) terminals, wires entering from the top, each terminal's parts in a column underneath it.
+* **Analog block:** the 4–20 mA jumpers and their shunts sit left of the analog columns, with the ADS1115 socket (J4) below them.
+* **Right:** the DevKit sockets with the antenna pointing right. Pin 1 sits 6 mm from the edge, so the antenna end overhangs the board, and a copper-free strip keeps the board's copper away from it.
+* **Left edge:** the relay-module header (J8) with its four MOSFET drivers.
+* **Bottom:** the power chain, with power (J1), GPIO (J9), I2C (J10), 1-Wire (J12) and the Qwiic socket along the bottom edge.
+* **Under the DevKit:** low SMD parts and tracks; it sits about 8.5 mm up on its sockets.
+
+**Rules** (net classes in the project):
+
+|Net class|Nets|Clearance|Track|
+|-|-|-|-|
+|Default|signals|0.2 mm|0.3 mm|
+|Power|GND, +5V, +3V3, +VS, VIN\_RAW, VIN\_F, VIN\_DK, 3V3\_OUT, VLOOP|0.2 mm|0.6 mm|
+|Touch|TCH1–6 (GPIO side), TT1–6 (terminal side)|0.5 mm|0.35 mm|
+
+The Touch class keeps other tracks, and the ground pour on both layers, 0.5 mm away from the touch traces. That lowers the idle capacitance the ESP32 measures, so a finger changes the reading more. The longest touch trace (T4) is 47 mm; T1 and T2 are the shortest. If one pad reads less clearly than the others, it is probably T3 or T4 and its threshold can be set a little higher in the Touch block.
+
+**DRC:** no errors and no unconnected items. The only warnings are "footprint library not in the current configuration" (they go away once KiCad has been started once).
+
+**Before ordering:** print the board at 1:1 and check the DevKit sockets against your DevKit (rows 25.4 mm apart) and the ADS1115 socket against your module's pinout.
+
+## Ordering the board
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" gerbers.py
+```
+
+[gerbers.py](gerbers.py) writes [fab/MB-2-gerbers.zip](fab/MB-2-gerbers.zip): copper, mask, paste and silkscreen on both sides, the outline, and plated and non-plated drill files in mm. Upload it at any PCB fab as a 2-layer, 1.6 mm, 120 × 80 mm board. MB-2 is hand-soldered, so there is no assembly BOM or placement file. The zip was checked against the board: 475 plated holes (383 vias, 92 pads) and 4 non-plated M3 holes, outline 120.00 × 80.00 mm.
+
+## 3D model for an enclosure
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" make_3d.py
+```
+
+[3d/MB-2.stl](3d/MB-2.stl) is the assembled board as one mesh (binary STL, mm) for Fusion, TinkerCAD or any CAD. The origin is the board's lower-left corner with the analog, input and touch terminals at the top; Z runs up from the bottom of the board (top surface at z = 1.6). The Traco regulator and the 1812 fuse have no KiCad model and are blocks from their data sheets. **The plugged-in DevKit and ADS1115 module are envelopes** measured from common boards, since they decide the enclosure's height: check them against your own modules.
+
+|Item|Where (mm)|Height (z, mm)|
+|-|-|-|
+|Board|0–120 × 0–80, 1.6 thick, 2 mm corner radius|0–1.6|
+|Mounting holes, M3 (3.2 mm)|(3.5, 3.5), (116.5, 3.5), (3.5, 76.5), (116.5, 76.5)| |
+|Pins and solder below the board|x 2.7–114.3|down to −2.9: standoffs of 5 mm or more|
+|ESP32 DevKit (plugged in)|x 73.9–125.4 (antenna end 5.4 mm past the right edge), y 25.2–53.5|10.1–15.0|
+|DevKit USB plug|left end of the DevKit, x ≈ 74, y ≈ 39|≈ 11.5–14.5; leave room for the cable|
+|ADS1115 module (plugged in)|x 21.4–49.4, y 41.5–59.3|10.1–13.5|
+|Power terminal J1 (5.08 mm, tallest part)|x 8.7–20.2, y 1.0–8.6|up to 15.4|
+|Bottom terminals J9, J10, J12 (wires in from the bottom edge)|x 21.7–69.3, y 1.0–8.6|up to 10.8|
+|Qwiic J11 (opening to the bottom edge)|x 73–79, y 1.5–6.5|up to 4.6|
+|Top terminals J5–J7 (wires in from the top edge)|x 8.2–87.2, y 71.4–79.0|up to 10.8|
+|Relay-module header J8 (cable to the module)|x 1.7–4.3, y 30–45|up to 10.1|
+|Traco regulator U1|x 30.3–38.7, y 13.4–25.5|up to 12.0|
+
+Keep the enclosure non-metallic around the DevKit's antenna end (right edge).
 
 ## BOM sketch (to be finalised with the schematic)
 

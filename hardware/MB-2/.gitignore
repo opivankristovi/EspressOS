@@ -4,3 +4,7 @@ erc.rpt
 *-backups/
 fp-info-cache
 __pycache__/
+MB-2.route.log
+drc.rpt
+*.dsn
+*.ses
