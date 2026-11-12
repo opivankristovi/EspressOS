@@ -20,6 +20,8 @@ using namespace eos;
 struct FakeHal : Hal {
   std::map<int, bool> din, dout;
   std::map<int, float> vin;
+  float touch = 0;  // raw reading every touch pin returns
+  float readTouch(int) override { return touch; }
   std::map<int, bool> setupLevel;  // level an output was configured with
   int safeCalls = 0;
   void setupOutput(int pin, bool level) override { setupLevel[pin] = level; dout[pin] = level; }
@@ -253,6 +255,20 @@ static const char* kMqtt =
     {"id":3,"type":"MQTTOUT","p":{"topic":"t/sw","fmt":"onoff","every":0}}],
     "wires":[[1,0,2,0],[1,1,3,0]]})";
 
+// Touched below the threshold, released a little above it; no reading counts as released.
+void test_touch_input() {
+  load(R"({"blocks":[{"id":1,"type":"TOUCH","p":{"pin":13,"thr":30}},{"id":2,"type":"DO","p":{"pin":16}}],"wires":[[1,0,2,0]]})");
+  struct { float raw; int q; } steps[] = {{60, 0}, {29, 1}, {31, 1}, {33, 0}, {31, 0}, {10, 1}, {0, 0}};
+  uint32_t now = 0;
+  for (auto& st : steps) {
+    hal.touch = st.raw;
+    eng->scan(now += 10);
+    TEST_ASSERT_EQUAL_FLOAT(st.q, eng->output(1, 0));
+    TEST_ASSERT_EQUAL_FLOAT(st.raw, eng->output(1, 1));
+    TEST_ASSERT_EQUAL(st.q != 0, hal.dout[16]);
+  }
+}
+
 void test_mqtt_in_out() {
   load(kMqtt);
   TEST_ASSERT_EQUAL(1, hal.subs.size());
@@ -321,7 +337,7 @@ static std::string readRepoFile(const std::string& rel) {
 
 // The chip tables are read from EspHal.cpp itself so they stay single-sourced
 // (tools/test_sim.js does the same for the editor's lists).
-static std::vector<int> gOut, gInOnly, gAdc;
+static std::vector<int> gOut, gInOnly, gAdc, gTouch;
 
 static std::vector<int> pinList(const std::string& src, const char* name) {
   std::vector<int> v;
@@ -349,7 +365,8 @@ static bool inPins(const std::vector<int>& v, int pin) {
 static bool chipOut(int pin) { return inPins(gOut, pin); }
 static bool chipValid(int pin) { return chipOut(pin) || inPins(gInOnly, pin); }
 static bool chipAdc(int pin) { return inPins(gAdc, pin); }
-static const ChipRules kChip = {chipValid, chipOut, chipAdc};
+static bool chipTouch(int pin) { return inPins(gTouch, pin); }
+static const ChipRules kChip = {chipValid, chipOut, chipAdc, chipTouch};
 
 static void loadChipTables() {
   if (!gOut.empty()) return;
@@ -357,7 +374,8 @@ static void loadChipTables() {
   gOut = pinList(src, "kOutPins");
   gInOnly = pinList(src, "kInOnlyPins");
   gAdc = pinList(src, "kAdcPins");
-  TEST_ASSERT_TRUE_MESSAGE(gOut.size() == 19 && gInOnly.size() == 4 && gAdc.size() == 6, "pin tables not found in firmware/src/EspHal.cpp");
+  gTouch = pinList(src, "kTouchPins");
+  TEST_ASSERT_TRUE_MESSAGE(gOut.size() == 19 && gInOnly.size() == 4 && gAdc.size() == 6 && gTouch.size() == 9, "pin tables not found in firmware/src/EspHal.cpp");
 }
 
 static std::string terminals41() {
@@ -499,6 +517,24 @@ void test_board_bare_and_failed_parse_keeps_old() {
   TEST_ASSERT_EQUAL(-1, b.sda());
 }
 
+void test_board_touch_terminals() {
+  loadChipTables();
+  BoardProfile b;
+  std::string err;
+  TEST_ASSERT_TRUE_MESSAGE(b.parse(R"({"schema":1,"id":"t-touch","name":"Touch","onewire":[4],"terminals":[
+      {"label":"T1","gpio":13,"uses":["touch"]},{"label":"IO1","gpio":27,"uses":["di","touch"]},{"label":"R1","gpio":16,"uses":["do"],"active":"high"}]})", err, kChip), err.c_str());
+  TEST_ASSERT_TRUE(b.allows(13, PinUse::Touch));
+  TEST_ASSERT_FALSE(b.allows(13, PinUse::DigitalIn));
+  TEST_ASSERT_TRUE(b.allows(27, PinUse::Touch));
+  TEST_ASSERT_TRUE(b.allows(27, PinUse::DigitalIn));
+  TEST_ASSERT_FALSE(b.allows(16, PinUse::Touch));
+  TEST_ASSERT_FALSE(b.allows(32, PinUse::Touch));  // touch-capable, but not wired on this board
+  TEST_ASSERT_EQUAL(BoardProfile::kTouch, b.uses(13));
+  TEST_ASSERT_FALSE(b.parse(R"({"schema":1,"id":"t-x","name":"X","terminals":[{"label":"T1","gpio":34,"uses":["touch"]}]})", err, kChip));
+  TEST_ASSERT_EQUAL_STRING("Terminal T1: GPIO 34 has no touch sensor (touch needs 2, 4, 12-15, 27, 32 or 33)", err.c_str());
+  TEST_ASSERT_TRUE(b.allows(13, PinUse::Touch));  // the failed parse kept the old profile
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_gates_truth_table);
@@ -516,11 +552,13 @@ int main() {
   RUN_TEST(test_inverted_output_starts_at_off_level);
   RUN_TEST(test_snapshot_json);
   RUN_TEST(test_bad_pins_rejected);
+  RUN_TEST(test_touch_input);
   RUN_TEST(test_mqtt_in_out);
   RUN_TEST(test_mqtt_topics_checked);
   RUN_TEST(test_board_vectors);
   RUN_TEST(test_board_preset_queries);
   RUN_TEST(test_board_active_low_and_no_bus);
   RUN_TEST(test_board_bare_and_failed_parse_keeps_old);
+  RUN_TEST(test_board_touch_terminals);
   return UNITY_END();
 }

@@ -5,7 +5,7 @@
 
 namespace eos {
 
-enum class PinUse { DigitalIn, DigitalOut, AnalogIn, PwmOut };
+enum class PinUse { DigitalIn, DigitalOut, AnalogIn, PwmOut, Touch };
 
 class Hal {
  public:
@@ -20,6 +20,8 @@ class Hal {
   virtual void writeDigital(int pin, bool v) { (void)pin; (void)v; }
   // Returns raw ADC reading (ESP32: 0..4095).
   virtual float readAnalog(int pin) { (void)pin; return 0; }
+  // Raw capacitive touch reading (ESP32: about 40..100 idle, lower while touched); 0 = no reading.
+  virtual float readTouch(int pin) { (void)pin; return 0; }
   virtual void setupPwm(int pin, int freq) { (void)pin; (void)freq; }
   // duty in percent 0..100
   virtual void writePwm(int pin, float duty) { (void)pin; (void)duty; }

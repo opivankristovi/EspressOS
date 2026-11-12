@@ -16,6 +16,7 @@ struct ChipRules {
   bool (*validPin)(int pin);       // usable at all (input or output)
   bool (*outputCapable)(int pin);  // can drive a level
   bool (*adcCapable)(int pin);     // ADC1 (ADC2 is unusable while Wi-Fi is on)
+  bool (*touchCapable)(int pin);   // has a capacitive touch sensor
 };
 
 class BoardProfile {
@@ -24,7 +25,7 @@ class BoardProfile {
   static constexpr size_t kMaxJson = 4096;  // serialized size limit
   static constexpr int kMaxTerminals = 40;
   // Bits of uses()
-  static constexpr uint8_t kDI = 1, kDO = 2, kAI = 4, kPWM = 8;
+  static constexpr uint8_t kDI = 1, kDO = 2, kAI = 4, kPWM = 8, kTouch = 16;
 
   BoardProfile() { setBare(); }
 
@@ -41,7 +42,7 @@ class BoardProfile {
   // Pin may be used by a block this way. Bare: always true (chip rules are
   // checked separately by the HAL).
   bool allows(int pin, PinUse use) const;
-  // Use bits (kDI..kPWM) of the terminal on `pin`; 0 = not wired.
+  // Use bits (kDI..kTouch) of the terminal on `pin`; 0 = not wired.
   uint8_t uses(int pin) const { return pin >= 0 && pin < kPins ? use_[pin] : 0; }
   // Required `inv` of DI/DO blocks on this pin: -1 none, 0 active-high, 1 active-low.
   int fixedInv(int pin) const { return pin >= 0 && pin < kPins ? inv_[pin] : -1; }

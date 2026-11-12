@@ -7,10 +7,11 @@
   const OUT_PINS = [2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
   const IN_PINS = OUT_PINS.concat([34, 35, 36, 39]).sort((a, b) => a - b);
   const ADC_PINS = [32, 33, 34, 35, 36, 39]; // ADC1 only: ADC2 is unusable while Wi-Fi is on
+  const TOUCH_PINS = [2, 4, 12, 13, 14, 15, 27, 32, 33]; // pins with a capacitive touch sensor (GPIO 0 has one too, but is a boot pin)
 
   const d = (n) => ({ n, t: 'd' });
   const a = (n) => ({ n, t: 'a' });
-  // use: 'di' | 'do' | 'ai' | 'pwm' (board profiles narrow the list by it, see boards.js); options = the bare chip list.
+  // use: 'di' | 'do' | 'ai' | 'pwm' | 'touch' (board profiles narrow the list by it, see boards.js); options = the bare chip list.
   const pin = (use, list, def) => ({ key: 'pin', label: 'GPIO', type: 'pin', use, options: list.map((p) => [p, 'GPIO ' + p]), def });
   const num = (key, label, def, unit, step) => ({ key, label, type: 'number', def, unit, step });
   const bool = (key, label, def) => ({ key, label, type: 'bool', def: def ? 1 : 0 });
@@ -28,6 +29,10 @@
     { type: 'AI', cat: 'io', label: 'Analog input', sym: 'AI', ins: [], outs: [a('')],
       params: [pin('ai', ADC_PINS, 34), num('min', 'Value at 0 V', 0), num('max', 'Value at 3.3 V', 100)],
       sum: (p) => 'GPIO ' + p.pin, help: 'ADC reading scaled linearly to min..max. Only ADC1 pins work while Wi-Fi is on.' },
+    { type: 'TOUCH', cat: 'io', label: 'Touch input', sym: 'T', ins: [], outs: [d('Q'), a('raw')],
+      params: [pin('touch', TOUCH_PINS, 13), num('thr', 'Touched below', 30, '', 1)],
+      sum: (p) => 'GPIO ' + p.pin + ' < ' + p.thr,
+      help: 'Capacitive touch pad: a wire to a metal plate or foil, also behind plastic or glass. The raw reading drops when the pad is touched; Q is on while it is below the threshold. Watch "raw" live to pick a threshold between the idle and the touched value.' },
     { type: 'AO', cat: 'io', label: 'PWM output', sym: 'AQ', ins: [a('%')], outs: [],
       params: [pin('pwm', OUT_PINS, 25), num('freq', 'Frequency', 1000, 'Hz')],
       sum: (p) => 'GPIO ' + p.pin, help: 'PWM duty cycle 0-100 % (dimming, fans, servo-less motors).' },
@@ -134,7 +139,7 @@
     return p;
   }
 
-  const api = { BLOCKS, CATS, DRIVERS, OUT_PINS, IN_PINS, ADC_PINS, blockDef, defaults, fmtTime };
+  const api = { BLOCKS, CATS, DRIVERS, OUT_PINS, IN_PINS, ADC_PINS, TOUCH_PINS, blockDef, defaults, fmtTime };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Catalog = api;
 })(this);

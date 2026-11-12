@@ -40,6 +40,7 @@ bool pinUseOf(const std::string& type, PinUse* use) {
   else if (type == "DO") *use = PinUse::DigitalOut;
   else if (type == "AI") *use = PinUse::AnalogIn;
   else if (type == "AO") *use = PinUse::PwmOut;
+  else if (type == "TOUCH") *use = PinUse::Touch;
   else return false;
   return true;
 }

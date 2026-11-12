@@ -72,7 +72,7 @@
   }
 
   // ------------------------------------------------------------ board profile helpers
-  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm', TOUCH: 'touch' };
   const bare = () => Boards.isBare(board);
   const hasPin = (p) => !!p && p.pin !== undefined && p.pin !== '' && p.pin !== null;
   // How a pin is shown: "GPIO 16" on a bare board (as always), the terminal label ("R1") on a profile.
@@ -248,7 +248,7 @@
 
   function pinClash(b) {
     if (b.p.pin === undefined) return '';
-    const others = editor.prog.blocks.filter((x) => x.id !== b.id && ['DI', 'DO', 'AI', 'AO'].includes(x.type) && Number(x.p.pin) === Number(b.p.pin));
+    const others = editor.prog.blocks.filter((x) => x.id !== b.id && IO_USE[x.type] && Number(x.p.pin) === Number(b.p.pin));
     if (!bare()) {  // the board's own notes replace the dev-board hints
       const t = Boards.terminalOf(board, b.p.pin);
       let msg = others.length ? pinName(b.p.pin) + ' is also used by ' + others.map((x) => 'B' + x.id).join(', ') + '.' : '';
@@ -269,11 +269,11 @@
     const pins = {};
     for (const b of prog.blocks) {
       const d = C.blockDef(b);
-      if (['DI', 'DO', 'AI', 'AO'].includes(b.type)) {
+      if (IO_USE[b.type]) {
         const k = Number(b.p.pin);
         const isOut = b.type === 'DO' || b.type === 'AO';
         if (bare()) {
-          const allowed = b.type === 'AI' ? C.ADC_PINS : isOut ? C.OUT_PINS : C.IN_PINS;
+          const allowed = b.type === 'AI' ? C.ADC_PINS : b.type === 'TOUCH' ? C.TOUCH_PINS : isOut ? C.OUT_PINS : C.IN_PINS;
           if (!allowed.includes(k)) out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: GPIO ${b.p.pin} cannot be used for this (pick another pin)` });
         } else if (!hasPin(b.p)) {
           out.push({ lvl: 'err', msg: `B${b.id} ${d.label}: pick a terminal`, pin: true });
@@ -343,7 +343,7 @@
 
   // ------------------------------------------------------------ live panel
   function liveStructureKey() {
-    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'DO', 'AO', 'MQTTIN', 'MQTTOUT'].includes(b.type)).map((b) => [b.id, b.p, b.note]), editor.prog.devices, be.kind, Boards.idOf(board)]);
+    return JSON.stringify([editor.prog.blocks.filter((b) => ['VIN', 'DI', 'AI', 'TOUCH', 'DO', 'AO', 'MQTTIN', 'MQTTOUT'].includes(b.type)).map((b) => [b.id, b.p, b.note]), editor.prog.devices, be.kind, Boards.idOf(board)]);
   }
   function renderLive() {
     const key = liveStructureKey();
@@ -375,9 +375,12 @@
       }
       if (be.kind === 'sim') {
         const dis = prog.blocks.filter((b) => b.type === 'DI'), ais = prog.blocks.filter((b) => b.type === 'AI');
-        if (dis.length || ais.length) pane.append(h('h3', {}, 'Simulated inputs'));
+        const tps = prog.blocks.filter((b) => b.type === 'TOUCH');
+        if (dis.length || ais.length || tps.length) pane.append(h('h3', {}, 'Simulated inputs'));
         for (const b of dis) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)}`),
           h('button', { class: 'switch', 'data-din': b.p.pin, onclick: (e) => be.setDin(b.p.pin, !e.currentTarget.classList.contains('on')) })));
+        for (const b of tps) pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)} (touch)`),
+          h('button', { class: 'switch', 'data-touch': b.p.pin, onclick: (e) => be.setTouch(b.p.pin, !e.currentTarget.classList.contains('on')) })));
         for (const b of ais) {
           pane.append(h('div', { class: 'kv' }, h('span', {}, `B${b.id} ${b.note || pinName(b.p.pin)}`), h('span', { class: 'v', 'data-ain-out': b.id })));
           pane.append(h('input', { type: 'range', class: 'slider', min: 0, max: 4095, value: be.hal.ain[b.p.pin] || 0, oninput: (e) => be.setAin(b.p.pin, Number(e.target.value)) }));
@@ -431,6 +434,7 @@
     });
     $$('[data-vin-out]', pane).forEach((e) => (e.textContent = window.fmtVal(snap.v ? snap.v[Number(e.dataset.vinOut)] : 0)));
     if (snap.sim) $$('[data-din]', pane).forEach((e) => e.classList.toggle('on', !!snap.sim.din[e.dataset.din]));
+    if (snap.sim) $$('[data-touch]', pane).forEach((e) => e.classList.toggle('on', !!(snap.sim.touch && snap.sim.touch[e.dataset.touch])));
     $$('[data-ain-out]', pane).forEach((e) => { const b = snap.b[e.dataset.ainOut]; e.textContent = b ? window.fmtVal(b[0]) : '–'; });
     $$('[data-out]', pane).forEach((e) => {
       const b = snap.run && snap.b ? snap.b[e.dataset.out] : null, x = b ? b[b.length - 1] : 0;
@@ -458,6 +462,8 @@
       else if (!down && !moved) be.setVin(idx, snap && snap.v && snap.v[idx] >= 0.5 ? 0 : 1);
     } else if (b.type === 'DI' && be.kind === 'sim' && !down && !moved) {
       be.setDin(b.p.pin, !be.hal.din[b.p.pin]);
+    } else if (b.type === 'TOUCH' && be.kind === 'sim' && !down && !moved) {
+      be.setTouch(b.p.pin, !be.hal.touch[b.p.pin]);
     }
   }
 
@@ -920,7 +926,7 @@
       onSelect: (b) => { renderProps(b); if (b) showSide('props'); },
       onChange,
       onWireRejected: (t) => toast(t === 'a' ? 'Analog values cannot drive a digital input directly. Use a Compare or Threshold block in between.' : 'Incompatible ports', true),
-      isSimInput: (b) => b.type === 'DI' && be && be.kind === 'sim',
+      isSimInput: (b) => (b.type === 'DI' || b.type === 'TOUCH') && be && be.kind === 'sim',
       onBackground: () => { if (isPhone()) openSide(false); },
     });
     initDevices();
@@ -997,7 +1003,7 @@
     bn.textContent = '';
     if (be.kind !== 'sim') return;
     if (connReason === 'forced') {
-      bn.append(h('b', {}, 'Simulation mode. '), 'Programs run here in your browser. Click Digital-input blocks to toggle them.');
+      bn.append(h('b', {}, 'Simulation mode. '), 'Programs run here in your browser. Click Digital-input and Touch-input blocks to toggle them.');
       return;
     }
     // The page was served by something, but the board API did not answer: say so loudly.

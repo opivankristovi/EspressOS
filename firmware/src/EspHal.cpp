@@ -6,11 +6,12 @@
 #include "Mqtt.h"
 #include "Sensors.h"
 
-// Usable pins; keep in sync with OUT_PINS / IN_PINS / ADC_PINS in web/js/catalog.js.
+// Usable pins; keep in sync with OUT_PINS / IN_PINS / ADC_PINS / TOUCH_PINS in web/js/catalog.js.
 // Left out: 0, 1, 3 (boot strap and serial), 6-11 (SPI flash on WROOM modules).
 static const int kOutPins[] = {2, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33};
 static const int kInOnlyPins[] = {34, 35, 36, 39};
 static const int kAdcPins[] = {32, 33, 34, 35, 36, 39};  // ADC1 only: ADC2 is unusable while Wi-Fi is on
+static const int kTouchPins[] = {2, 4, 12, 13, 14, 15, 27, 32, 33};  // T2, T0, T5, T4, T6, T3, T7, T9, T8 (T1 = GPIO 0 is a boot pin)
 
 template <size_t N>
 static bool inList(const int (&list)[N], int pin) {
@@ -22,20 +23,22 @@ static bool inList(const int (&list)[N], int pin) {
 bool EspHal::outputCapable(int pin) { return inList(kOutPins, pin); }
 bool EspHal::validPin(int pin) { return outputCapable(pin) || inList(kInOnlyPins, pin); }
 bool EspHal::adcCapable(int pin) { return inList(kAdcPins, pin); }
+bool EspHal::touchCapable(int pin) { return inList(kTouchPins, pin); }
 
 const char* EspHal::pinProblem(int pin, eos::PinUse use) {
   if (!validPin(pin)) return "cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)";
   if ((use == eos::PinUse::DigitalOut || use == eos::PinUse::PwmOut) && !outputCapable(pin)) return "is input-only";
   if (use == eos::PinUse::AnalogIn && !adcCapable(pin)) return "has no usable ADC (use 32-36 or 39)";
+  if (use == eos::PinUse::Touch && !touchCapable(pin)) return "has no touch sensor (use 2, 4, 12-15, 27, 32 or 33)";
   if (!board || board->allows(pin, use)) return nullptr;
   uint8_t m = board->uses(pin);
   if (!m) return "is not wired to a terminal on this board";
   // Only called from Engine::load (under the engine lock), so one buffer is enough.
-  static char why[40];
-  static const char* const kNames[] = {"DI", "DO", "AI", "PWM"};
+  static char why[48];
+  static const char* const kNames[] = {"DI", "DO", "AI", "PWM", "TOUCH"};
   strcpy(why, "is ");
   bool first = true;
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < 5; i++)
     if (m & (1 << i)) {
       if (!first) strcat(why, "/");
       strcat(why, kNames[i]);
@@ -67,6 +70,8 @@ void EspHal::writeDigital(int pin, bool v) {
 }
 
 float EspHal::readAnalog(int pin) { return validPin(pin) ? (float)analogRead(pin) : 0; }
+
+float EspHal::readTouch(int pin) { return touchCapable(pin) ? (float)touchRead(pin) : 0; }
 
 void EspHal::setupPwm(int pin, int freq) {
   if (!outputCapable(pin)) return;

@@ -211,6 +211,8 @@ test('pin rules live on the HAL; no board means the chip rules only', () => {
   assert.equal(hal.pinProblem(34, 'do'), 'is input-only');
   assert.equal(hal.pinProblem(34, 'pwm'), 'is input-only');
   assert.match(hal.pinProblem(25, 'ai'), /no usable ADC/);
+  assert.equal(hal.pinProblem(13, 'touch'), null);
+  assert.match(hal.pinProblem(34, 'touch'), /no touch sensor/);
   assert.match(hal.pinProblem(6, 'di'), /flash chip/);
   // a HAL can narrow it further, and Engine.load asks the HAL
   class Narrow extends NullHal { pinProblem(pin, use) { return pin === 4 ? 'is reserved here' : super.pinProblem(pin, use); } }
@@ -225,4 +227,21 @@ test('pin lists match the firmware (EspHal.cpp)', () => {
   assert.deepEqual(list('kOutPins'), C.OUT_PINS);
   assert.deepEqual([...list('kOutPins'), ...list('kInOnlyPins')].sort((a, b) => a - b), C.IN_PINS);
   assert.deepEqual(list('kAdcPins'), C.ADC_PINS);
+  assert.deepEqual(list('kTouchPins'), C.TOUCH_PINS);
+});
+
+test('touch input: on below the threshold, off a little above it, off without a reading', () => {
+  class TouchHal extends NullHal { constructor() { super(); this.raw = 60; } readTouch() { return this.raw; } }
+  const hal = new TouchHal(), e = new Engine(hal);
+  assert.equal(e.load({ blocks: [{ id: 1, type: 'TOUCH', p: { pin: 13, thr: 30 } }, { id: 2, type: 'DO', p: { pin: 16 } }], wires: [[1, 0, 2, 0]] }), null);
+  e.run();
+  let now = 0;
+  const q = (raw) => { hal.raw = raw; e.scan(now += 10); return [e.output(1, 0), e.output(1, 1)]; };
+  assert.deepEqual(q(60), [0, 60]);
+  assert.deepEqual(q(29), [1, 29]);   // touched
+  assert.deepEqual(q(31), [1, 31]);   // inside the 10 % gap: stays on
+  assert.deepEqual(q(33), [0, 33]);   // released
+  assert.deepEqual(q(31), [0, 31]);   // and stays off until below the threshold again
+  assert.deepEqual(q(10), [1, 10]);
+  assert.deepEqual(q(0), [0, 0]);     // no reading = not touched
 });

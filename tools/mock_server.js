@@ -22,6 +22,7 @@ class MockHal extends NullHal {
   readVirtual(i) { return vin[i] || 0; }
   readDigital(pin) { return Math.floor(Date.now() / 3000) % 2 === 1 && pin === 4; } // GPIO4 toggles every 3 s
   readAnalog() { return 2048 + Math.sin(Date.now() / 4000) * 1500; }
+  readTouch() { return Math.floor(Date.now() / 5000) % 2 ? 14 : 60; } // touched every other 5 s
   readSensor(dev, ch) {
     const d = devices.find((x) => x.id === dev);
     if (!d) return { ok: false, v: 0 };

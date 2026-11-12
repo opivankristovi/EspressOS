@@ -89,11 +89,12 @@
 
   // ------------------------------------------------------------ simulation
   class SimHal extends root.Sim.NullHal {
-    constructor(be) { super(); this.be = be; this.din = {}; this.ain = {}; this.dout = {}; this.pwm = {}; }
+    constructor(be) { super(); this.be = be; this.din = {}; this.ain = {}; this.touch = {}; this.dout = {}; this.pwm = {}; }
     readDigital(p) { return !!this.din[p]; }
     setupOutput(p, level) { this.dout[p] = level ? 1 : 0; }
     writeDigital(p, v) { this.dout[p] = v ? 1 : 0; }
     readAnalog(p) { return this.ain[p] || 0; }
+    readTouch(p) { return this.touch[p] ? 12 : 62; }  // typical raw values: touched / idle
     writePwm(p, d) { this.pwm[p] = d; }
     readVirtual(i) { return this.be.vin[i] || 0; }
     readSensor(dev, ch) { const s = this.be.sensors[dev]; return s ? { ok: true, v: s.v[ch] || 0 } : { ok: false, v: 0 }; }
@@ -146,7 +147,7 @@
       const s = this.engine.snapshot();
       s.v = this.vin.slice();
       s.dev = (this.prog.devices || []).map((d) => ({ id: d.id, driver: d.driver, ok: true, v: (this.sensors[d.id] || { v: [] }).v }));
-      s.sim = { din: { ...this.hal.din }, ain: { ...this.hal.ain }, dout: { ...this.hal.dout }, pwm: { ...this.hal.pwm } };
+      s.sim = { din: { ...this.hal.din }, ain: { ...this.hal.ain }, touch: { ...this.hal.touch }, dout: { ...this.hal.dout }, pwm: { ...this.hal.pwm } };
       return s;
     }
     _emit() { const s = this.snapshot(); for (const l of this.listeners) l(s); }
@@ -219,6 +220,7 @@
     // simulation-only inputs
     setDin(pin, v) { this.hal.din[pin] = v ? 1 : 0; this._tick(); this._emit(); }
     setAin(pin, raw) { this.hal.ain[pin] = raw; }
+    setTouch(pin, v) { this.hal.touch[pin] = v ? 1 : 0; this._tick(); this._emit(); }
     setSensor(dev, ch, v) { const s = this.sensors[dev]; if (s) { s.manual = true; s.v[ch] = v; } }
   }
 

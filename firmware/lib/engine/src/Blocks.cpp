@@ -41,6 +41,24 @@ struct AI : Block {
   }
 };
 
+// Capacitive touch pad. The raw reading drops while the pad is touched: Q goes on
+// below `thr` and off again a little above it, so a finger at the limit does not chatter.
+struct Touch : Block {
+  int pin; float thr; bool on = false;
+  explicit Touch(const Params& p) : pin((int)p.num("pin", -1)), thr(p.num("thr", 30)) {}
+  void begin(Hal&) override { on = false; }
+  void eval(Ctx& c) override {
+    float raw = pin >= 0 ? c.hal->readTouch(pin) : 0;
+    float gap = thr * 0.1f < 2 ? 2 : thr * 0.1f;
+    if (raw <= 0) on = false;  // no reading
+    else if (raw < thr) on = true;
+    else if (raw >= thr + gap) on = false;
+    set(c, 0, on ? 1 : 0);
+    set(c, 1, raw);
+    extra = raw;
+  }
+};
+
 struct AO : Block {
   int pin, freq; float last = -1;
   explicit AO(const Params& p) : pin((int)p.num("pin", -1)), freq((int)p.num("freq", 1000)) {}
@@ -367,6 +385,7 @@ Block* make(const Params& p) { return new T(p); }
 
 const std::vector<BlockType> kTypes = {
     {"DI", 0, 1, make<DI>},          {"DO", 1, 0, make<DO>},          {"AI", 0, 1, make<AI>},
+    {"TOUCH", 0, 2, make<Touch>},
     {"AO", 1, 0, make<AO>},          {"CONST", 0, 1, make<Const>},    {"VIN", 0, 1, make<VIn>},
     {"SENSOR", 0, 2, make<Sensor>},  {"AND", 4, 1, make<Gate<Op::And>>}, {"OR", 4, 1, make<Gate<Op::Or>>},
     {"XOR", 4, 1, make<Gate<Op::Xor>>}, {"NAND", 4, 1, make<Gate<Op::Nand>>}, {"NOR", 4, 1, make<Gate<Op::Nor>>},

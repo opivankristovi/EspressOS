@@ -17,6 +17,7 @@ class EspHal : public eos::Hal {
   bool readDigital(int pin) override;
   void writeDigital(int pin, bool v) override;
   float readAnalog(int pin) override;
+  float readTouch(int pin) override;
   void setupPwm(int pin, int freq) override;
   void writePwm(int pin, float duty) override;
   float readSensor(int dev, int channel, bool* ok) override;
@@ -33,7 +34,8 @@ class EspHal : public eos::Hal {
   static bool validPin(int pin);
   static bool outputCapable(int pin);
   static bool adcCapable(int pin);
-  static eos::ChipRules chipRules() { return {validPin, outputCapable, adcCapable}; }
+  static bool touchCapable(int pin);
+  static eos::ChipRules chipRules() { return {validPin, outputCapable, adcCapable, touchCapable}; }
 
  private:
   uint64_t outMask_ = 0;  // pins configured as digital outputs

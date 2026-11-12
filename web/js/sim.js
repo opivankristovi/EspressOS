@@ -4,10 +4,10 @@
 (function (root) {
   'use strict';
 
-  const N_IN = { DI: 0, DO: 1, AI: 0, AO: 1, CONST: 0, VIN: 0, SENSOR: 0, AND: 4, OR: 4, XOR: 4, NAND: 4, NOR: 4,
+  const N_IN = { DI: 0, DO: 1, AI: 0, TOUCH: 0, AO: 1, CONST: 0, VIN: 0, SENSOR: 0, AND: 4, OR: 4, XOR: 4, NAND: 4, NOR: 4,
     NOT: 1, SR: 2, EDGE: 1, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 0, CTR: 3, CMP: 2, THRESH: 1, MATH: 2, SCALE: 1, SEL: 3,
     MQTTIN: 0, MQTTOUT: 1 };
-  const N_OUT = { DI: 1, DO: 0, AI: 1, AO: 0, CONST: 1, VIN: 1, SENSOR: 2, AND: 1, OR: 1, XOR: 1, NAND: 1, NOR: 1,
+  const N_OUT = { DI: 1, DO: 0, AI: 1, TOUCH: 2, AO: 0, CONST: 1, VIN: 1, SENSOR: 2, AND: 1, OR: 1, XOR: 1, NAND: 1, NOR: 1,
     NOT: 1, SR: 1, EDGE: 2, TON: 1, TOF: 1, TP: 1, BLINK: 1, WEEK: 1, CTR: 2, CMP: 1, THRESH: 1, MATH: 1, SCALE: 1, SEL: 1,
     MQTTIN: 2, MQTTOUT: 0 };
   const MAX_MQTT = 16, MAX_TOPIC = 96;
@@ -47,11 +47,12 @@
   const node = typeof module !== 'undefined' && module.exports;
   const Cat = node ? require('./catalog.js') : root.Catalog;
   const Boards = node ? require('./boards.js') : root.Boards;
-  const PIN_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  const PIN_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm', TOUCH: 'touch' };
   function chipProblem(pin, use) {
     if (!Cat.IN_PINS.includes(pin)) return 'cannot be used (0, 1 and 3 are boot/serial pins, 6-11 belong to the flash chip)';
     if ((use === 'do' || use === 'pwm') && !Cat.OUT_PINS.includes(pin)) return 'is input-only';
     if (use === 'ai' && !Cat.ADC_PINS.includes(pin)) return 'has no usable ADC (use 32-36 or 39)';
+    if (use === 'touch' && !Cat.TOUCH_PINS.includes(pin)) return 'has no touch sensor (use 2, 4, 12-15, 27, 32 or 33)';
     return null;
   }
 
@@ -66,6 +67,11 @@
           eval(c) { const on = this.inb(c, 0), v = (on !== inv) ? 1 : 0; if (v !== this.last) { h(c).writeDigital(pin, v); this.last = v; } this.extra = on ? 1 : 0; } }; }
       case 'AI': { const pin = n('pin', -1), lo = n('min', 0), hi = n('max', 100);
         return { eval(c) { const raw = h(c).readAnalog(pin); this.set(c, 0, lo + raw / 4095 * (hi - lo)); this.extra = raw; } }; }
+      case 'TOUCH': { const pin = n('pin', -1), thr = n('thr', 30), gap = Math.max(2, thr * 0.1);
+        return { on: false, begin() { this.on = false; },
+          eval(c) { const raw = h(c).readTouch(pin);
+            if (raw <= 0) this.on = false; else if (raw < thr) this.on = true; else if (raw >= thr + gap) this.on = false;
+            this.set(c, 0, this.on ? 1 : 0); this.set(c, 1, raw); this.extra = raw; } }; }
       case 'AO': { const pin = n('pin', -1), freq = n('freq', 1000);
         return { begin(hh) { hh.setupPwm(pin, freq); },
           eval(c) { const d = Math.min(100, Math.max(0, this.inp(c, 0))); h(c).writePwm(pin, d); this.extra = d; } }; }
@@ -188,7 +194,7 @@
     // Chip rule first, then the board profile in this.board (if any) narrows it.
     pinProblem(pin, use) { return chipProblem(pin, use) || Boards.pinProblem(this.board, pin, use); }
     setupInput() {} setupOutput(pin, level) {} readDigital() { return false; } writeDigital() {}
-    readAnalog() { return 0; } setupPwm() {} writePwm() {}
+    readAnalog() { return 0; } readTouch() { return 0; } setupPwm() {} writePwm() {}
     readSensor() { return { ok: false, v: 0 }; } timeOfDay() { return null; }
     readVirtual() { return 0; } safeOutputs() {}
     // MQTT: a simple in-memory broker. Handles are topic strings.

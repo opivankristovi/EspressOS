@@ -345,7 +345,7 @@ static bool deploy(const char* json, String& err) {
   for (JsonObjectConst b : doc["blocks"].as<JsonArrayConst>()) {
     const char* t = b["type"] | "";
     bool di = !strcmp(t, "DI"), dout = !strcmp(t, "DO");
-    if (!di && !dout && strcmp(t, "AI") && strcmp(t, "AO")) continue;
+    if (!di && !dout && strcmp(t, "AI") && strcmp(t, "AO") && strcmp(t, "TOUCH")) continue;
     JsonObjectConst p = b["p"];
     int pin = (int)numParam(p["pin"], -1);
     String where = "Block " + String((int)(b["id"] | 0)) + ": GPIO " + String(pin);

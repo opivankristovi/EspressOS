@@ -6,8 +6,8 @@
   'use strict';
   const Cat = typeof module !== 'undefined' && module.exports ? require('./catalog.js') : root.Catalog;
 
-  const USES = ['di', 'do', 'ai', 'pwm'];
-  const USE_NAME = { di: 'digital in', do: 'digital out', ai: 'analog in', pwm: 'PWM out' };
+  const USES = ['di', 'do', 'ai', 'pwm', 'touch'];
+  const USE_NAME = { di: 'digital in', do: 'digital out', ai: 'analog in', pwm: 'PWM out', touch: 'touch' };
   // Relays must not sit here: these pins pulse or are sampled at reset (relays chatter or the board won't boot).
   const BOOT_PINS = [0, 2, 5, 12, 14, 15];
   const MAX_BYTES = 4096, MAX_TERMINALS = 40;
@@ -15,8 +15,8 @@
 
   const t = (label, gpio, uses, group, note, extra) => Object.assign({ label, gpio, uses }, extra, group ? { group } : {}, note ? { note } : {});
   const relay = (n, gpio, note) => t('R' + n, gpio, ['do'], 'Relays', note, { active: 'high' });
+  const touch = (n, gpio, note) => t('T' + n, gpio, ['touch'], 'Touch', note);
   const io = (n, gpio) => t('IO' + n, gpio, ['di', 'do', 'pwm'], 'GPIO');
-  const opto = (n, gpio) => t('DI' + n, gpio, ['di'], 'Inputs', '12-24 V opto', { active: 'low', pull: false });
 
   const PRESETS = [
     BARE,
@@ -30,14 +30,15 @@
         io(1, 23), io(2, 25), io(3, 26), io(4, 27), io(5, 13),
         t('IO6', 14, ['di'], 'GPIO', 'input only: pulses at boot'),
       ] },
-    { schema: 1, id: 'eos-mb2', name: 'MB-2 8 DI + 4 relay', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
+    // Hardware: hardware/MB-2/README.md. A carrier for a 30-pin DevKit. Its four precise analog inputs
+    // (AI1-AI4) are ADS1115 channels on I2C (address 0x48), read with the Sensor value block, so they are not terminals.
+    { schema: 1, id: 'eos-mb2', name: 'MB-2 Sensor node + touch + 4 relay', rev: 'A', i2c: { sda: 21, scl: 22 }, onewire: [4],
       terminals: [
-        ...[36, 39, 34, 35, 13, 14, 27, 26].map((g, i) => opto(i + 1, g)),
-        t('AI1', 32, ['ai'], 'Analog in', '0-10 V / 4-20 mA jumper'),
-        t('AI2', 33, ['ai'], 'Analog in', '0-10 V / 4-20 mA jumper'),
-        relay(1, 16), relay(2, 17), relay(3, 18), relay(4, 19),
-        t('Q1', 23, ['do', 'pwm'], 'DC outputs', 'MOSFET, 24 V DC 0.5 A'),
-        t('Q2', 25, ['do', 'pwm'], 'DC outputs', 'MOSFET, 24 V DC 0.5 A'),
+        t('IN1', 36, ['ai', 'di'], 'Inputs', '0-3.3 V (0-10 V, 4-20 mA: ADS1115 sensor)', { pull: false }),
+        ...[39, 34, 35].map((g, i) => t('IN' + (i + 2), g, ['ai', 'di'], 'Inputs', '0-3.3 V', { pull: false })),
+        touch(1, 13), touch(2, 14), touch(3, 15), touch(4, 27), touch(5, 32), touch(6, 33),
+        relay(1, 16, 'Relay module header, 5 V'), relay(2, 17), relay(3, 18), relay(4, 19),
+        io(1, 23), io(2, 25), io(3, 26),
       ] },
   ];
 
@@ -97,11 +98,12 @@
       labels.add(L);
       const g = x.gpio;
       if (!Number.isInteger(g) || !Cat.IN_PINS.includes(g)) return L + ': GPIO ' + g + ' cannot be used (flash, serial or boot pin, or not a GPIO)';
-      if (!Array.isArray(x.uses) || !x.uses.length) return L + ': "uses" must list at least one of di, do, ai, pwm';
+      if (!Array.isArray(x.uses) || !x.uses.length) return L + ': "uses" must list at least one of di, do, ai, pwm, touch';
       for (const u of x.uses) if (!USES.includes(u)) return L + ': unknown use ' + JSON.stringify(u);
       if (new Set(x.uses).size !== x.uses.length) return L + ': a use is listed twice';
       if ((x.uses.includes('do') || x.uses.includes('pwm')) && !Cat.OUT_PINS.includes(g)) return L + ': GPIO ' + g + ' is input-only';
       if (x.uses.includes('ai') && !Cat.ADC_PINS.includes(g)) return L + ': GPIO ' + g + ' has no usable ADC (ADC1: 32-36, 39)';
+      if (x.uses.includes('touch') && !Cat.TOUCH_PINS.includes(g)) return L + ': GPIO ' + g + ' has no touch sensor (2, 4, 12-15, 27, 32, 33)';
       if (given(x.active)) {
         if (x.active !== 'high' && x.active !== 'low') return L + ': active must be "high" or "low"';
         if (x.uses.some((u) => u !== 'di' && u !== 'do')) return L + ': a fixed active level only fits di/do terminals';
@@ -120,7 +122,7 @@
   const idOf = (p) => (isBare(p) ? 'bare' : p.id);
   // The board a program was made for. Like the firmware: anything but a string (absent, null, a number) = bare.
   const stampOf = (prog) => (prog && typeof prog.board === 'string' ? prog.board : 'bare');
-  const CHIP = { di: () => Cat.IN_PINS, do: () => Cat.OUT_PINS, ai: () => Cat.ADC_PINS, pwm: () => Cat.OUT_PINS };
+  const CHIP = { di: () => Cat.IN_PINS, do: () => Cat.OUT_PINS, ai: () => Cat.ADC_PINS, pwm: () => Cat.OUT_PINS, touch: () => Cat.TOUCH_PINS };
 
   function pinsFor(p, use) {
     if (isBare(p)) return CHIP[use]().slice();
@@ -150,7 +152,7 @@
   }
 
   // Moves a program to another board: by terminal label, else same GPIO, else no pin (the user picks one).
-  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm' };
+  const IO_USE = { DI: 'di', DO: 'do', AI: 'ai', AO: 'pwm', TOUCH: 'touch' };
   function retarget(prog0, from, to) {
     const prog = JSON.parse(JSON.stringify(prog0));
     const notes = [];

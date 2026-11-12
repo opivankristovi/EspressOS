@@ -136,24 +136,25 @@ bool BoardProfile::parse(const char* json, std::string& err, const ChipRules& ch
     if (!claim(pin, what)) return false;
 
     JsonVariantConst uv = tm["uses"];
-    if (!uv.is<JsonArrayConst>() || !uv.size()) { err = what + ": uses must list di, do, ai and/or pwm"; return false; }
+    if (!uv.is<JsonArrayConst>() || !uv.size()) { err = what + ": uses must list di, do, ai, pwm and/or touch"; return false; }
     uint8_t mask = 0;
     for (JsonVariantConst u : uv.as<JsonArrayConst>()) {
       const char* s = u.is<const char*>() ? u.as<const char*>() : "";
-      uint8_t bit = !strcmp(s, "di") ? kDI : !strcmp(s, "do") ? kDO : !strcmp(s, "ai") ? kAI : !strcmp(s, "pwm") ? kPWM : 0;
-      if (!bit) { err = what + ": unknown use \"" + s + "\" (di, do, ai, pwm)"; return false; }
+      uint8_t bit = !strcmp(s, "di") ? kDI : !strcmp(s, "do") ? kDO : !strcmp(s, "ai") ? kAI : !strcmp(s, "pwm") ? kPWM : !strcmp(s, "touch") ? kTouch : 0;
+      if (!bit) { err = what + ": unknown use \"" + s + "\" (di, do, ai, pwm, touch)"; return false; }
       if (mask & bit) { err = what + ": use \"" + s + "\" listed twice"; return false; }
       mask |= bit;
     }
     if ((mask & (kDO | kPWM)) && !chip.outputCapable(pin)) { err = what + ": GPIO " + num(pin) + " is input-only (no do/pwm)"; return false; }
     if ((mask & kAI) && !chip.adcCapable(pin)) { err = what + ": GPIO " + num(pin) + " has no usable ADC (ai needs 32-36 or 39)"; return false; }
+    if ((mask & kTouch) && !chip.touchCapable(pin)) { err = what + ": GPIO " + num(pin) + " has no touch sensor (touch needs 2, 4, 12-15, 27, 32 or 33)"; return false; }
 
     int8_t inv = -1;
     JsonVariantConst act = tm["active"];
     if (!act.isNull()) {
       const char* a = act.is<const char*>() ? act.as<const char*>() : "";
       if (strcmp(a, "high") && strcmp(a, "low")) { err = what + ": active must be \"high\" or \"low\""; return false; }
-      if (mask & (kAI | kPWM)) { err = what + ": a fixed active level only fits di/do terminals"; return false; }
+      if (mask & (kAI | kPWM | kTouch)) { err = what + ": a fixed active level only fits di/do terminals"; return false; }
       if ((mask & kDO) && bootNoisy(pin)) {
         err = what + ": GPIO " + num(pin) + " is a boot-strapping/boot-noisy pin; a relay there chatters at reset or stops the board from booting";
         return false;
@@ -174,7 +175,7 @@ bool BoardProfile::parse(const char* json, std::string& err, const ChipRules& ch
 
 bool BoardProfile::allows(int pin, PinUse use) const {
   if (bare_) return true;
-  uint8_t bit = use == PinUse::DigitalIn ? kDI : use == PinUse::DigitalOut ? kDO : use == PinUse::AnalogIn ? kAI : kPWM;
+  uint8_t bit = use == PinUse::DigitalIn ? kDI : use == PinUse::DigitalOut ? kDO : use == PinUse::AnalogIn ? kAI : use == PinUse::Touch ? kTouch : kPWM;
   return uses(pin) & bit;
 }
 
