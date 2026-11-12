@@ -187,8 +187,8 @@ Reference designators on the sheet:
 [MB-1.kicad\_pcb](MB-1.kicad_pcb): two layers, 120 × 100 mm, all parts on top. Renders: [top](MB-1-top.png), [bottom](MB-1-bottom.png). Like the schematic it is generated, and then routed by a script:
 
 ```bash
-"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" gen_pcb.py
-"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" route.py
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" gen_pcb.py
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" route.py
 kicad-cli pcb drc MB-1.kicad_pcb
 ```
 
@@ -216,6 +216,37 @@ Mains tracks are 2 mm wide on both layers. That carries 5 A with about 20 °C ri
 * Milled slots between relay coil and contact pins, and between SSR input and load pins (the layout rules ask for them; the 6 mm clearance already holds without them).
 * Gerbers, and a check of the part rotations in JLCPCB's placement preview (see *Ordering at JLCPCB*).
 * A look at the board in KiCad's 3D viewer and a printout at 1:1 to check the terminal and relay footprints against real parts.
+
+## 3D model for an enclosure
+
+[3d/MB-1.stl](3d/MB-1.stl) is the assembled board as one mesh (binary STL, mm), for designing an enclosure in Fusion, TinkerCAD or any CAD that imports STL. [make\_3d.py](make_3d.py) makes it from the routed board:
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" make_3d.py
+```
+
+KiCad's library has no 3D model for the USB-C socket, the G2RL relays, the 1812 PTC or the project's own G3MB footprint. For those the script adds a solid block: the body outline from the footprint's fabrication drawing, the height from the data sheet (maximum).
+
+**Coordinates.** The origin is the board's lower-left corner, with low voltage at the top and mains at the bottom, as in the renders. X runs along the 120 mm edge and Y along the 100 mm edge. Z runs up from the bottom of the board, so the top surface is at z = 1.6.
+
+**What the enclosure has to clear** (from the model):
+
+|Item|Where (mm)|Height (z, mm)|
+|-|-|-|
+|Board|0–120 × 0–100, 1.6 thick, 2 mm corner radius|0–1.6|
+|Mounting holes, M3 (3.2 mm)|(3.5, 3.5), (116.5, 3.5), (62, 3.5), (3.5, 96.5), (116.5, 96.5)| |
+|Pins and solder below the board|whole board|down to −2.9: standoffs of 5 mm or more|
+|SSRs K3/K4 (tallest)|x 64.2–69.8 and 72.2–77.8, y 15.5–40.1|up to 22.1|
+|Relays K1/K2|x 9.5–22.0 and 28.4–41.1, y 13.4–42.3|up to 17.3|
+|Mains terminals J2, J3, J4 (screws on top, wires in from the bottom edge)|y 0.9–10.7; x 8.7–43.7 and 80.7–94.9|up to 15.4|
+|Low-voltage terminals J6–J9 (screws on top, wires in from the top edge)|y 85.8–99.0, x 10.1–99.6|up to 10.8|
+|Qwiic socket J5 (opening to the top edge)|x 98–104, y 93.5–98.5|up to 4.6|
+|USB-C J1 (opening to the left edge)|mouth at x 0.7, y 65.5–74.5|1.6–4.9|
+|RESET / BOOT buttons (pressed from above)|x 1.8–8.2, y 44.9–58.6|up to 3.1|
+|Fuse sockets F3/F4|x 99–108, y 9–29|socket 7.2; the TR5 fuse sits on top: measure with the fuse fitted|
+|ESP32 antenna|x 94.5–119.5, y 55–73 (module), antenna at the right edge|keep metal away from the right edge|
+
+The enclosure has to keep fingers off the mains side. All mains copper (relay contacts, SSR load pins, fuses, terminals J2–J4) lies below the copper-free band at y 28.4–34.4; the relay and SSR bodies straddle that band.
 
 ## BOM (one board)
 
@@ -278,10 +309,19 @@ Notes:
 ### Ordering at JLCPCB
 
 ```bash
-"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" jlc.py
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" jlc.py
+"%LOCALAPPDATA%\Programs\KiCad\10.0\bin\python.exe" jlc_check.py
 ```
 
-[jlc.py](jlc.py) writes [jlcpcb/MB-1-bom.csv](jlcpcb/MB-1-bom.csv) and [jlcpcb/MB-1-cpl.csv](jlcpcb/MB-1-cpl.csv) from the routed board: the 89 SMD parts with their LCSC numbers, positions in mm from the board's lower-left corner, and rotations. Upload them with the Gerbers (KiCad: *File → Fabrication Outputs*, or `kicad-cli pcb export gerbers` and `kicad-cli pcb export drill`). JLCPCB's library sometimes turns a part differently from KiCad, so check each part in the placement preview, above all the SOT-23 and SOT-223 parts, the CH340C, the USB-C socket and the ESP32, and turn any that are wrong there.
+[jlc.py](jlc.py) writes the three files JLCPCB asks for, from the routed board:
+
+* [jlcpcb/MB-1-gerbers.zip](jlcpcb/MB-1-gerbers.zip): copper, mask, paste and silkscreen on both sides, the outline, and plated and non-plated drill files (Protel file names, silkscreen clipped at the mask openings, drill in mm), as JLCPCB's KiCad guide asks. Two-layer board, 120 × 100 mm.
+* [jlcpcb/MB-1-bom.csv](jlcpcb/MB-1-bom.csv): the 89 SMD parts in 32 lines, with their LCSC numbers.
+* [jlcpcb/MB-1-cpl.csv](jlcpcb/MB-1-cpl.csv): position (mm from the board's lower-left corner) and rotation of each SMD part.
+
+JLCPCB places its own library footprint for each LCSC part, and for some packages its zero rotation or origin differs from KiCad's. The `JLC_FIX` table in jlc.py corrects those: +180° for the SOT-23 parts (Q1–Q6, D6–D11) and the AP7361C, +270° for the CH340C, USBLC6 and TPD4E05U06, and +270° plus a 3.68 mm offset for the ESP32. The USB-C socket keeps its rotation but gets a 1.57 mm offset. [jlc_check.py](jlc_check.py) verifies the result the way JLCPCB's placement preview does: it fetches each part's footprint from EasyEDA (JLCPCB's library) and fits its numbered pads onto the KiCad pads. It also compares both libraries' pin names per pad, which caught the red LEDs (C2286): their pad 1 is the anode, KiCad's is the cathode, so a plain pad-number match would have turned them round. All 89 parts check out: right rotation, centred within 0.1 mm, and the same pinout and polarity. The largest pad difference left is 0.4 mm on the CH340C, where JLCPCB's SOIC land pattern is wider.
+
+Still worth one look in JLCPCB's own placement preview when ordering (it needs a JLCPCB account): the check uses the same library data, but the preview is what the factory goes by.
 
 ## Layout rules
 
