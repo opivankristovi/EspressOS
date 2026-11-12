@@ -77,7 +77,7 @@ R('R1', '5.1k 1%', 'CC1', 'GND')
 R('R2', '5.1k 1%', 'CC2', 'GND')
 part('F1', 'Device:Polyfuse', '1.5A hold', 'PTC1812', {'1': 'VBUS_IN', '2': '+5V'}, MPN='Bourns MF-MSMF150-2')
 part('D1', 'Diode:SMAJ5.0A', 'SMAJ5.0A', None, {'1': '+5V', '2': 'GND'}, MPN='Littelfuse SMAJ5.0A')
-part('C1', 'Device:C_Polarized', '100u 10V', 'CP', {'1': '+5V', '2': 'GND'})
+part('C1', 'Device:C_Polarized', '100u 16V', 'CP', {'1': '+5V', '2': 'GND'})
 C('C2', '10u', '+5V', 'GND', 'C0805')
 part('U2', 'Regulator_Linear:AP7361C-33E', 'AP7361C-33E', None, {'VI': '+5V', 'VO': '+3V3', 'GND': 'GND'},
      MPN='Diodes AP7361C-33E-13')
@@ -167,7 +167,7 @@ part('U6', 'Power_Protection:TPD4E05U06DQA', 'TPD4E05U06', None,
      {'D1+': 'TIO5', 'D1-': 'TIO6', 'D2+': 'SDA', 'D2-': 'SCL', 'GND': 'GND'}, MPN='TI TPD4E05U06DQAR')
 part('J7', 'Connector:Screw_Terminal_01x08', 'IO1-IO6, 3V3, GND', 'PT8',
      {**{str(n): f'TIO{n}' for n in range(1, 7)}, '7': '3V3_OUT', '8': 'GND'})
-part('F2', 'Device:Polyfuse', '0.2A hold', 'PTC1206', {'1': '+3V3', '2': '3V3_OUT'}, MPN='Bourns MF-MSMF020-2')
+part('F2', 'Device:Polyfuse', '0.2A hold', 'PTC1206', {'1': '+3V3', '2': '3V3_OUT'}, MPN='Bourns MF-NSMF020-2')
 R('R8', '4.7k', 'SDA', '+3V3')
 R('R9', '4.7k', 'SCL', '+3V3')
 R('R10', '4.7k', 'DQ', '+3V3')
@@ -176,6 +176,55 @@ part('J8', 'Connector:Screw_Terminal_01x03', '1-Wire', 'PT3', {'1': '3V3_OUT', '
 part('J9', 'Connector:Screw_Terminal_01x04', 'I2C', 'PT4', {'1': '3V3_OUT', '2': 'SDA', '3': 'SCL', '4': 'GND'})
 part('J5', 'Connector_Generic:Conn_01x04', 'Qwiic', 'Connector_JST:JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal',
      {'1': 'GND', '2': '3V3_OUT', '3': 'SDA', '4': 'SCL'}, MPN='JST SM04B-SRSS-TB')
+
+# Ordering: LCSC part number (JLCPCB assembly) and manufacturer part number per part.
+# Looked up in JLCPCB's parts catalogue on 2026-11-12. "basic" parts carry no per-part setup
+# fee at JLCPCB; the others are "extended" ($3 each per order). The through-hole parts (J2-J4,
+# J6-J9, K1-K4, F3/F4) are soldered by hand; their numbers are for ordering from LCSC.
+ORDER = {
+    # refs: (LCSC, MPN)
+    'C1': ('C2887276', 'KNSCHA RVT100UF16V67RV0016'),  # 100 uF 16 V, 6.3 x 5.4 mm: fits the 6.3 x 7.7 land pattern
+    'C2 C3': ('C15850', 'Samsung CL21A106KAYNNNE'),     # basic
+    'C4 C8': ('C45783', 'Samsung CL21A226MAQNNNE'),     # basic
+    'C5 C6 C9 C10 C11 C12 C13 C14 C15 C16': ('C14663', 'Yageo CC0603KRX7R9BB104'),  # basic
+    'C7': ('C15849', 'Samsung CL10A105KB8NNNC'),        # basic
+    'D1': ('C83329', 'Littelfuse SMAJ5.0A'),
+    'D3': ('C51450', 'Nexperia PESD3V3L1BA,115'),
+    'D4 D5': ('C81598', '1N4148W'),                     # basic
+    'D6 D7 D8 D9 D10 D11': ('C47546', 'Nexperia BAT54S,215'),
+    'F1': ('C89648', 'Bourns MF-MSMF150-2'),
+    'F2': ('C185112', 'Bourns MF-NSMF020-2'),           # 1206 (the MSMF series is 1812)
+    'F3 F4': ('C142909', 'Littelfuse 56000001009'),     # TR5 socket; fuse: C142854 Littelfuse 37212000001 (2 A T)
+    'J1': ('C165948', 'HRO TYPE-C-31-M-12'),
+    'J2 J3 J4': ('C480520', 'Phoenix MKDS 1,5/ 3-5,08 (1715734)'),
+    'J5': ('C160404', 'JST SM04B-SRSS-TB(LF)(SN)'),
+    'J6 J7': ('C5484501', 'Phoenix PT 1,5/ 8-3,5-H (1984675)'),
+    'J8': ('C3816291', 'Phoenix PT 1,5/ 3-3,5-H (1984620)'),
+    'J9': ('C5144867', 'Phoenix PT 1,5/ 4-3,5-H (1984633)'),
+    'K1 K2': ('C1524672', 'Omron G2RL-1 DC5'),
+    'K3 K4': ('C19591980', 'Omron G3MB-202P DC5'),
+    'LED1': ('C12624', 'KENTO KT-0603G'),
+    'LED2 LED3 LED4 LED5': ('C2286', 'KENTO KT-0603R'),  # basic
+    'Q1 Q2': ('C20526', 'MMBT3904'),                     # basic
+    'Q3 Q4 Q5 Q6': ('C20917', 'AOS AO3400A'),            # basic
+    'R1 R2': ('C23186', 'Uniroyal 0603WAF5101T5E'),      # basic, 1 %
+    'R3 R19 R20 R21 R22': ('C21190', 'Uniroyal 0603WAF1001T5E'),
+    'R4 R5 R6 R7 R29 R30 R31 R32 R33 R34': ('C25804', 'Uniroyal 0603WAF1002T5E'),
+    'R8 R9 R10': ('C23162', 'Uniroyal 0603WAF4701T5E'),
+    'R11 R12 R13 R14 R35 R36 R37 R38 R39 R40': ('C22775', 'Uniroyal 0603WAF1000T5E'),
+    'R15 R16 R17 R18': ('C25803', 'Uniroyal 0603WAF1003T5E'),
+    'R23 R24 R25 R26 R27 R28': ('C22984', 'Uniroyal 0603WAF3002T5E'),
+    'SW1 SW2': ('C2886897', 'E-Switch TL3342F450QG'),
+    'U1': ('C701341', 'Espressif ESP32-WROOM-32E-N4'),
+    'U2': ('C500795', 'Diodes AP7361C-33E-13'),
+    'U3': ('C84681', 'WCH CH340C'),
+    'U4': ('C7519', 'ST USBLC6-2SC6'),
+    'U5 U6': ('C138714', 'TI TPD4E05U06DQAR'),
+}
+_by_ref = {r: v for refs, v in ORDER.items() for r in refs.split()}
+for _p in PARTS:
+    if not _p['sym'].startswith('power:'):
+        _p['fields']['LCSC'], _p['fields']['MPN'] = _by_ref[_p['ref']]
 
 # --------------------------------------------------------------------- s-expressions
 def parse(text):

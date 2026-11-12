@@ -95,7 +95,7 @@ The 3V3 terminal positions share a 200 mA PTC, so a shorted sensor cable cannot 
 
 ### Power: USB-C 5 V
 - J1: USB-C receptacle (USB 2.0, 16-pin). CC1 and CC2 each go to GND through their own 5.1 kΩ (R1, R2). Without those the C-to-C charger gives no power.
-- F1: PTC, 1.5 A hold, on VBUS. D1: SMAJ5.0A TVS from VBUS to GND. C1 100 µF/10 V and C2 10 µF on the 5V rail.
+- F1: PTC, 1.5 A hold, on VBUS. D1: SMAJ5.0A TVS from VBUS to GND. C1 100 µF/16 V and C2 10 µF on the 5V rail.
 - U2: AP7361C-33E (1 A, about 0.36 V dropout) from 5V to 3V3. Input C3 10 µF, output C4 22 µF + C5 100 nF. Do not use AMS1117: its 1.1 V dropout leaves no margin when USB VBUS sags.
 - D2 + R3 1 kΩ: green power LED on 3V3.
 - **Budget:** ESP32 Wi-Fi peaks at about 500 mA; each relay coil draws about 72 mA; each SSR input about 10–20 mA; LEDs about 10 mA. The total peak is about 0.75 A. Use a USB-C charger or a USB 3 port rated for at least 1 A. A USB 2 port (500 mA) may brown out when Wi-Fi transmits with both relays on.
@@ -192,7 +192,7 @@ Reference designators on the sheet:
 kicad-cli pcb drc MB-1.kicad_pcb
 ```
 
-* **[gen\_pcb.py](gen_pcb.py)** reads the parts and nets from `gen_schematic.py`, places every footprint, and writes the outline, mounting holes, silkscreen labels, ground pours and design rules. Footprints keep their schematic links, so *Update PCB from Schematic* in KiCad still works. Ground pads that tracks would fence in (U4, U5, U6, the AI filter caps, each output driver's MOSFET source and gate pull-down) get a locked via before routing. Strips 0.5 mm wide along the board edge keep tracks off it. `gen_pcb.py --silk` redoes only the silkscreen on the routed board.
+* **[gen\_pcb.py](gen_pcb.py)** reads the parts and nets from `gen_schematic.py`, places every footprint, and writes the outline, mounting holes, silkscreen labels, ground pours and design rules. Footprints keep their schematic links, so *Update PCB from Schematic* in KiCad still works. Ground pads that tracks would fence in (U4, U5, U6, the AI filter caps, each output driver's MOSFET source and gate pull-down) get a locked via before routing. Strips 0.5 mm wide along the board edge keep tracks off it. `gen_pcb.py --silk` copies the part fields (values, MPN, LCSC) from `gen_schematic.py` and redoes the silkscreen on the routed board, without touching copper.
 * **[route.py](route.py)** exports the board to Freerouting, routes it (about 15 minutes), reads the result back and cleans up after it: it removes loose vias and dead-end stubs, fills the pours, adds ground stitching vias on a 4 mm grid (0.5 mm from any other hole), joins every piece of ground pour that is cut off from the main ground with a via, and widens the few tracks Freerouting necks below 0.13 mm. Freerouting's router is deterministic and can stall with a net open; route.py then retries with a slightly larger clearance margin. It needs the Freerouting 2.5 jar (from its GitHub releases) and Java 25; the native `freerouting-cli` 2.5.0 build crashes and then hangs. Freerouting's log goes to `MB-1.route.log`.
 
 **Layout.** SELV parts fill the top 65 mm: terminals along the top edge, the ESP32 at the right edge with its antenna past the copper, USB-C and the power and USB-serial parts on the left, the four output drivers in a row above the keep-out. A 6 mm keep-out band across the board (y 65.6–71.6 mm) carries no copper on either layer. Below it are only mains parts: K1/K2 above J2/J3 on the left, K3/K4 with F3/F4 and J4 on the right. Relay coils and SSR inputs are the only things that bridge the band, through the parts themselves.
@@ -214,42 +214,74 @@ Mains tracks are 2 mm wide on both layers. That carries 5 A with about 20 °C ri
 **Open before ordering:**
 
 * Milled slots between relay coil and contact pins, and between SSR input and load pins (the layout rules ask for them; the 6 mm clearance already holds without them).
-* LCSC part numbers on every SMD part, then JLCPCB's BOM and CPL export.
+* Gerbers, and a check of the part rotations in JLCPCB's placement preview (see *Ordering at JLCPCB*).
 * A look at the board in KiCad's 3D viewer and a printout at 1:1 to check the terminal and relay footprints against real parts.
 
 ## BOM (one board)
 
-Manufacturer part numbers are real parts. Look up the LCSC numbers in the JLCPCB catalogue when drawing the schematic, and prefer "basic" parts for the passives.
+Every part has an LCSC number (the `LCSC` field in the schematic and PCB, set in the `ORDER` table of [gen\_schematic.py](gen_schematic.py)). They were looked up in JLCPCB's parts catalogue on 12 November 2026; stock changes, so check the numbers again when ordering. **Basic** parts carry no setup fee at JLCPCB; every other (extended) SMD part costs $3 per order. MB-1 has 15 extended SMD parts.
 
-| Ref | Qty | Part | Manufacturer / MPN | Notes |
-|---|---|---|---|---|
-| U1 | 1 | ESP32 module, 4 MB | Espressif ESP32-WROOM-32E-N4 | -N8 also fits; never WROVER |
-| U2 | 1 | LDO 3.3 V 1 A, SOT-223 | Diodes AP7361C-33E-13 | |
-| U3 | 1 | USB-serial, SOP-16 | WCH CH340C | powered from 3V3 |
-| U4 | 1 | USB ESD, SOT-23-6 | ST USBLC6-2SC6 | |
-| U5, U6 | 2 | 4-ch ESD, USON-10 | TI TPD4E05U06DQAR | |
-| Q1, Q2 | 2 | NPN, SOT-23 | onsemi MMBT3904 | |
-| Q3–Q6 | 4 | N-MOSFET logic level, SOT-23 | AOS AO3400A | |
-| K1, K2 | 2 | Relay SPDT 5 V, 12 A | Omron G2RL-1 DC5 | coil and contacts at opposite ends (creepage) |
-| K3, K4 | 2 | SSR 2 A AC, zero-cross, SIP-4 | Omron G3MB-202P DC5 | |
-| F1 | 1 | PTC 1.5 A hold, 1206/1812 | Bourns MF-MSMF150-2 | |
-| F2 | 1 | PTC 0.2 A hold | Bourns MF-MSMF020-2 | |
-| F3, F4 | 2 | Fuse 2 A time-lag, TR5, in a TR5 socket | Littelfuse 372 series 2 A T + 560 series socket | |
-| D1 | 1 | TVS 5 V, SMA | Littelfuse SMAJ5.0A | |
-| D3 | 1 | ESD diode for DQ, SOD-323 | Nexperia PESD3V3L1BA | |
-| D4, D5 | 2 | Flyback diodes, SOD-123 | 1N4148W | |
-| Dc1–Dc6 | 6 | Schottky pair, SOT-23 | Nexperia BAT54S | |
-| LED1–LED5 | 5 | 0603 LED | 1 green (power), 4 red (outputs) | |
-| J1 | 1 | USB-C 16-pin receptacle | Korean Hroparts TYPE-C-31-M-12 | |
-| J2, J3 | 2 | Screw terminal 3-pos 5.08 mm | Phoenix Contact MKDS 1,5/ 3-5,08 (1715734) | |
-| J4 | 1 | Screw terminal 3-pos 5.08 mm | Phoenix Contact MKDS 1,5/ 3-5,08 (1715734) | SSR L in, R3 load, R4 load |
-| J6, J7 | 2 | Screw terminal 8-pos 3.5 mm | any 3.5 mm PCB terminal (e.g. Phoenix PT 1,5 series) | |
-| J8 / J9 | 1 / 1 | Screw terminal 3-pos / 4-pos 3.5 mm | same series | |
-| J5 | 1 | Qwiic socket | JST SM04B-SRSS-TB | |
-| SW1, SW2 | 2 | Tact switch, SMD | any 6×6 or 5.1×5.1 mm | reachable from the front |
-| R | — | 0603 resistors | 5.1k ×2, 1k ×5, 10k ×4 + 6 (1 %), 30k 1 % ×6, 100R ×10, 100k ×4, 4.7k ×3 | |
-| C | — | Capacitors | 100 µF/10 V ×1 (electrolytic or 1206 ceramic), 22 µF ×2, 10 µF ×2, 1 µF ×1, 100 nF ×10 | X5R/X7R, 10 V or more |
-| Standoffs | 5 | M3 standoffs + screws | any | the board has no enclosure of its own |
+**SMD, placed by JLCPCB**
+
+| Ref | Qty | Part | MPN | LCSC | Type |
+|---|---|---|---|---|---|
+| U1 | 1 | ESP32 module, 4 MB | Espressif ESP32-WROOM-32E-N4 | C701341 | extended |
+| U2 | 1 | LDO 3.3 V 1 A, SOT-223 | Diodes AP7361C-33E-13 | C500795 | extended (low stock, about 2,500) |
+| U3 | 1 | USB-serial, SOP-16 | WCH CH340C | C84681 | extended |
+| U4 | 1 | USB ESD, SOT-23-6 | ST USBLC6-2SC6 | C7519 | extended |
+| U5, U6 | 2 | 4-ch ESD, USON-10 | TI TPD4E05U06DQAR | C138714 | extended |
+| Q1, Q2 | 2 | NPN, SOT-23 | MMBT3904 | C20526 | basic |
+| Q3–Q6 | 4 | N-MOSFET logic level, SOT-23 | AOS AO3400A | C20917 | basic |
+| D1 | 1 | TVS 5 V, SMA | Littelfuse SMAJ5.0A | C83329 | extended |
+| D3 | 1 | ESD diode for DQ, SOD-323 | Nexperia PESD3V3L1BA,115 | C51450 | extended |
+| D4, D5 | 2 | Flyback diode, SOD-123 | 1N4148W | C81598 | basic |
+| D6–D11 | 6 | Schottky pair, SOT-23 | Nexperia BAT54S,215 | C47546 | extended |
+| F1 | 1 | PTC 1.5 A hold, 1812 | Bourns MF-MSMF150-2 | C89648 | extended |
+| F2 | 1 | PTC 0.2 A hold, 1206 | Bourns MF-NSMF020-2 | C185112 | extended |
+| J1 | 1 | USB-C 16-pin receptacle | HRO TYPE-C-31-M-12 | C165948 | extended |
+| J5 | 1 | Qwiic socket | JST SM04B-SRSS-TB(LF)(SN) | C160404 | extended |
+| SW1, SW2 | 2 | Tact switch 5.2 mm | E-Switch TL3342F450QG | C2886897 | extended (about 600 in stock) |
+| LED1 | 1 | LED green 0603 | KENTO KT-0603G | C12624 | extended |
+| LED2–LED5 | 4 | LED red 0603 | KENTO KT-0603R | C2286 | basic |
+| C1 | 1 | 100 µF 16 V electrolytic, 6.3 × 5.4 mm | KNSCHA RVT100UF16V67RV0016 | C2887276 | extended |
+| C2, C3 | 2 | 10 µF 25 V X5R 0805 | Samsung CL21A106KAYNNNE | C15850 | basic |
+| C4, C8 | 2 | 22 µF 25 V X5R 0805 | Samsung CL21A226MAQNNNE | C45783 | basic |
+| C5, C6, C9–C16 | 10 | 100 nF 50 V X7R 0603 | Yageo CC0603KRX7R9BB104 | C14663 | basic |
+| C7 | 1 | 1 µF 50 V X5R 0603 | Samsung CL10A105KB8NNNC | C15849 | basic |
+| R1, R2 | 2 | 5.1 kΩ 1 % 0603 | Uniroyal 0603WAF5101T5E | C23186 | basic |
+| R3, R19–R22 | 5 | 1 kΩ 1 % 0603 | Uniroyal 0603WAF1001T5E | C21190 | basic |
+| R4–R7, R29–R34 | 10 | 10 kΩ 1 % 0603 | Uniroyal 0603WAF1002T5E | C25804 | basic |
+| R8–R10 | 3 | 4.7 kΩ 1 % 0603 | Uniroyal 0603WAF4701T5E | C23162 | basic |
+| R11–R14, R35–R40 | 10 | 100 Ω 1 % 0603 | Uniroyal 0603WAF1000T5E | C22775 | basic |
+| R15–R18 | 4 | 100 kΩ 1 % 0603 | Uniroyal 0603WAF1003T5E | C25803 | basic |
+| R23–R28 | 6 | 30 kΩ 1 % 0603 | Uniroyal 0603WAF3002T5E | C22984 | basic |
+
+Notes:
+
+* *C1* is 5.4 mm tall rather than 7.7 mm: no 100 µF part in the 6.3 × 7.7 mm size was in stock. Its pads are 0.1 mm further in than the board's 6.3 × 7.7 mm land pattern, which takes it without change.
+* *F2* is the 1206 version (MF-**N**SMF020-2). The MSMF series that the first BOM named is 1812 and would not fit the footprint.
+
+**Through-hole, soldered by hand** (order from LCSC or any distributor)
+
+| Ref | Qty | Part | MPN | LCSC | Stock at LCSC |
+|---|---|---|---|---|---|
+| K1, K2 | 2 | Relay SPDT 5 V 12 A | Omron G2RL-1 DC5 | C1524672 | about 1,100 |
+| K3, K4 | 2 | SSR 2 A AC, zero-cross, SIP-4 | Omron G3MB-202P DC5 | C19591980 | **none**: buy elsewhere (Mouser, DigiKey, Farnell) |
+| F3, F4 | 2 | TR5 fuse socket | Littelfuse 56000001009 | C142909 | yes |
+| (in F3, F4) | 2 | Fuse 2 A time-lag, TR5 | Littelfuse 37212000001 | C142854 | about 1,400 |
+| J2–J4 | 3 | Screw terminal 3-pos 5.08 mm | Phoenix MKDS 1,5/ 3-5,08 (1715734) | C480520 | about 1,100 |
+| J6, J7 | 2 | Screw terminal 8-pos 3.5 mm | Phoenix PT 1,5/ 8-3,5-H (1984675) | C5484501 | **none**: buy elsewhere |
+| J8 | 1 | Screw terminal 3-pos 3.5 mm | Phoenix PT 1,5/ 3-3,5-H (1984620) | C3816291 | about 500 |
+| J9 | 1 | Screw terminal 4-pos 3.5 mm | Phoenix PT 1,5/ 4-3,5-H (1984633) | C5144867 | about 200 |
+| — | 5 | M3 standoffs and screws | any | | |
+
+### Ordering at JLCPCB
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" jlc.py
+```
+
+[jlc.py](jlc.py) writes [jlcpcb/MB-1-bom.csv](jlcpcb/MB-1-bom.csv) and [jlcpcb/MB-1-cpl.csv](jlcpcb/MB-1-cpl.csv) from the routed board: the 89 SMD parts with their LCSC numbers, positions in mm from the board's lower-left corner, and rotations. Upload them with the Gerbers (KiCad: *File → Fabrication Outputs*, or `kicad-cli pcb export gerbers` and `kicad-cli pcb export drill`). JLCPCB's library sometimes turns a part differently from KiCad, so check each part in the placement preview, above all the SOT-23 and SOT-223 parts, the CH340C, the USB-C socket and the ESP32, and turn any that are wrong there.
 
 ## Layout rules
 

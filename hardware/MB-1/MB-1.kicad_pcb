@@ -153,6 +153,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C165948"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a93a31f8-f989-4531-a968-6868103febf1")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/bb822df3-ac8a-51dd-af6b-9d1e3041836b")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -550,6 +562,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C20917"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2349a95d-4e02-4131-88d8-3718c358a0eb")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "AOS AO3400A"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "465f24c6-59b9-47dc-abe6-38f51ffdf716")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -1029,6 +1065,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5bc69f29-def5-4a90-a7f0-88ba0f4adaa1")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f639350e-b831-455d-ac5d-84d9e651816c")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/42a71cbf-8239-51c6-9eae-39dd3b3b64c9")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -1178,6 +1238,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "4aea40d8-c90c-4cb8-aca7-af1719d18e3a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1898a251-9ea6-4f27-bfca-3a51e575fcda")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/49a62056-4206-5ec0-af44-19f35cb24791")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -1319,11 +1403,23 @@
 				)
 			)
 		)
-		(property "MPN" "Nexperia PESD3V3L1BA"
+		(property "MPN" "Nexperia PESD3V3L1BA,115"
 			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6a07dd14-14a3-4cec-bf42-2a19365b0540")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C51450"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c64f9c2d-60f6-4037-a9ad-d096f336bac0")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1604,6 +1700,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "44ffe183-8428-40ba-a7a5-e99ab8b3862e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "91658bca-a0a2-4159-83f5-5fb0fc5da5d4")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -1977,6 +2097,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "48f94a9c-95c6-458d-bf97-9d87f9c40034")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6ac16c11-e03d-4163-bcf7-47619031362b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/dc33df1b-36a8-51dd-ae2c-9f3520e9a1a8")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -2118,11 +2262,23 @@
 				)
 			)
 		)
-		(property "MPN" "Littelfuse 372 series 2 A T"
+		(property "MPN" "Littelfuse 56000001009"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f08840a0-08db-420d-882e-f5887c03ae52")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C142909"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "54637fab-8805-4d58-a980-bcdc866ad70a")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2486,6 +2642,30 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4f0da066-8d9d-4b5d-b301-c7fcbd805a7f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2886897"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b150daee-93a1-4904-b889-8d033d65d6f5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "E-Switch TL3342F450QG"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b4355dc1-6aa8-40aa-a464-7d676c5a9b8e")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3063,6 +3243,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3e479a29-be6d-4f5a-9a26-8f72bf2cc22f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fa815d0d-68b1-4d82-9ad3-46516817f667")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/07cb201b-694f-5f68-bad1-e5a91923f00e")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -3444,6 +3648,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C7519"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "953ff08b-c3a3-493a-b885-cf282f0641fa")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/30c7940b-4689-5e95-9fea-034db673a122")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -3787,6 +4003,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fb826b36-45b8-4de6-955e-eb276a4e8b51")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2844fcb2-d969-4193-a613-5108037e2ccc")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/494214a4-9cbb-5a76-b872-81758d5caeda")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -3921,6 +4161,30 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "a26744f7-7732-459a-bc08-0a831768e22e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2886897"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6f5c8e1d-6ac7-43b8-8b87-347aa8a8977a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "E-Switch TL3342F450QG"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fd94ecac-57e5-46a6-b16a-8cc890886980")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4498,6 +4762,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C45783"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "513df590-5500-4308-a136-69646d311ec9")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Samsung CL21A226MAQNNNE"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7989ba1c-da92-47ab-abdc-926feae4bee9")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/c167a95d-5a4f-5a41-924d-3834a09acad1")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -4647,6 +4935,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C45783"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e61894ad-2f00-416a-96b8-05f262f7ec5b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Samsung CL21A226MAQNNNE"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d80fede5-e701-4cf4-9ccf-c0dba237ba1d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/165b7458-1695-5978-aae1-0841cb0856e1")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -4792,6 +5104,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "feeb3165-ba8c-494d-bfb1-f8bf4cc72c1e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "022f9e67-15a0-4a79-85d2-60b148805771")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -5165,6 +5501,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C2286"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "cc2d96e3-9f10-4e26-a107-0259154c86c5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KENTO KT-0603R"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e6acca78-6590-48bf-9b78-c89428fb383d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/c03be24b-ce73-5964-bc86-bfefc3e8d9d9")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -5348,6 +5708,30 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "dedb11a7-4e92-48e5-86f1-44e86d91b18a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C81598"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8927517c-feba-4d14-970a-91d80ccb560a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "1N4148W"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f9e35161-378b-41e0-baec-995b36cb5a18")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5638,6 +6022,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C20917"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b6a602fb-9f2d-4b8a-9d10-0cb75e6bf0f6")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "AOS AO3400A"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "099e5f05-b53f-4753-b11e-e6d58d396c33")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -6011,6 +6419,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7b36f893-6cbc-4052-a06f-65c9923ab9cd")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d8d43fca-ee18-4c23-b41d-0d26821aa546")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/01e10800-f2a6-55d4-88ad-e0e4c9b1613a")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -6156,6 +6588,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C15849"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6f407a71-5d85-4631-9c5e-2533bda97dca")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Samsung CL10A105KB8NNNC"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1aec22cf-8fa7-49a9-8bc7-e10b5eef61f4")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -6309,6 +6765,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a9ef6650-41d7-4cf3-a801-53e648bc613d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c9a247fb-8eda-4ed4-bc19-0b5687a9a78d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/7adbc0b2-fc2a-50da-99d5-635e0af8d530")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -6455,6 +6935,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d789c070-59c6-4e57-9145-c0a55dff34f2")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C138714"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8eedcfcf-feea-43a3-b987-9bea3cef556c")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6751,6 +7243,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0a1feec9-0868-4042-809d-d1b5d6df0fea")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0d891635-e7e6-409a-adc4-09639fd03b06")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/39616a3f-e469-57a5-b0ce-b2687eaf8bca")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -6896,6 +7412,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2de2f1fd-1802-4434-bbf8-775aa7e734db")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "62d6b064-e052-4113-b883-8d61e91069fe")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -7049,6 +7589,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C15850"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a3bf063b-26bb-4b8e-9775-b07c3aaaa818")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Samsung CL21A106KAYNNNE"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e2153c88-a2db-4a25-baa3-ffa661ded8c7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/71d4371a-d38c-5d64-b8d7-cf5b040a75be")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -7198,11 +7762,23 @@
 				)
 			)
 		)
-		(property "MPN" "Phoenix MKDS 1,5/3-5,08 (1715734)"
+		(property "MPN" "Phoenix MKDS 1,5/ 3-5,08 (1715734)"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "8f5f29e1-5390-433f-bd82-7bd2f07046f3")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C480520"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b38125ed-f26d-41fa-89d0-a36d9095db37")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7605,6 +8181,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C20917"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6b270b0f-e0f6-4689-9d09-8e5d7f38cba1")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "AOS AO3400A"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2ac397b5-9e59-46b0-a0fb-3358db77ae73")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/966aba37-6926-52b2-a10e-6832fdc6dad2")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -7974,6 +8574,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3b747f34-a465-4cbb-90b2-f2390c45b702")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1003T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c25cace5-8690-48d7-80c1-048e122b4a30")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/2319083c-dde3-5d29-b35a-66e607c5cb76")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -8119,6 +8743,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a8a507d2-746b-4760-ae12-fededed01bec")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "228d45c3-5802-45b2-89a6-8f7d6a7e673f")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -8590,11 +9238,23 @@
 				)
 			)
 		)
-		(property "MPN" "Littelfuse 372 series 2 A T"
+		(property "MPN" "Littelfuse 56000001009"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "93b4919d-4c1d-4b87-801e-0e80e8b349ac")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C142909"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1a835522-2eb1-4907-94c1-2cba6cb3be8a")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8977,6 +9637,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C138714"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ea37d4d4-6b63-4fa5-9d1b-7b2b7fe8c96d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/dc80f402-70c1-528f-8fc7-5a0353f9880d")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -9266,6 +9938,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a2daf29d-6f01-4721-91e4-86fb30c63bc9")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5e308f85-f22b-447b-8686-74c76be7d54b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/3323f3f4-3c66-5f90-b719-eaa9b93cb2ec")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -9415,6 +10111,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "86370df0-bdd9-4578-a73b-f8ba9e19c27f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c0d5cc3c-0d75-4351-ac0b-cf4f2edb2c62")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/84c3fb12-40e4-52d9-bc0e-fe53733732c2")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -9560,6 +10280,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C5484501"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "110824ed-e229-4dbb-ab8d-0d6cbbaba581")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Phoenix PT 1,5/ 8-3,5-H (1984675)"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c0e3f307-aaa1-4fca-bdf9-ecb680281de0")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -10139,6 +10883,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "23079141-1e73-4544-8355-0f060c812c0b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "65b4fc18-e016-413e-940a-bba16821fdf4")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/761057f4-8e71-50a8-8e31-20c68c0bb946")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -10284,6 +11052,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e6f33bd7-887f-4029-b81f-92b4bb9a6cc7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "45ea0623-d543-4ce2-ad03-8bbaa2de111f")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -10657,6 +11449,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1872d83f-0ff5-42fb-9072-8a060c591012")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fb40dc39-c7b8-485b-b8ef-c47f82f7a809")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/fb7e84e7-cc9b-59e6-89ef-45a48c997e8d")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -10802,6 +11618,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f4ff59fc-4d3d-4467-b350-7a076413f246")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1001T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "383d295a-f821-488c-89e4-fdf77e307c75")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -10952,6 +11792,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "79309d85-5396-4a9d-a323-dd8bb554674c")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C1524672"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "cad58696-9b36-4341-bdfb-f1046385ae4d")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11305,6 +12157,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b0824597-a565-4f75-ad75-7ac6128e6508")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f2da1504-3fa5-404d-b59e-5296d199e767")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/a6bcf76e-2c50-5c3a-9213-2ebaea951bf6")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -11450,6 +12326,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C3816291"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "19da8dfb-9a0f-47d3-b1ba-44662e1d5e62")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Phoenix PT 1,5/ 3-3,5-H (1984620)"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e969039f-2dd1-4072-8f01-5599c5fc84e8")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -11935,6 +12835,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "15a53998-b25d-4280-a8be-ae4f85ff1136")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d771af2a-3def-4d36-82e1-6d24c306e91e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/3ef2e290-3276-59bc-9c78-992ba6a8a803")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -12080,6 +13004,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "51120258-3b99-4bee-82b5-acc72db03346")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "615b6c31-f9e3-43e8-bd5c-f3a4fc1ad96d")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -12233,6 +13181,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d96d55e9-7633-4087-8b71-f2250263784b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7541b87e-8b7a-4583-9948-5535005a6f98")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/01795df3-ee45-5c5a-8399-30817cc001e4")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -12378,6 +13350,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C12624"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ab5ef5f1-28e3-4120-a397-527d8e0383e9")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KENTO KT-0603G"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b482a6fd-8862-4b3f-b2e0-e79ab74fae78")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -12577,6 +13573,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "4367f7fb-3c58-48b6-8a3d-7c122a897555")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C500795"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5b77d9b0-71cb-470a-a358-10ce1a46e118")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -12834,6 +13842,30 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0cc32c29-07c6-4152-adf4-e87e0df9df04")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C81598"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "74708144-83f9-4b5d-b0ee-9deb6ce63e51")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "1N4148W"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1b14d530-00a2-4cc0-8de3-531af0c220c9")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13128,6 +14160,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a7a6be28-66c2-4ef3-8f7f-232f9f6859eb")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5a653095-3c1f-4b51-b7c8-d11de283777b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/1601b162-0421-540c-9d00-a56f597948da")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -13277,6 +14333,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "887adbf6-1766-425f-817e-ca1e38a38416")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1003T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0c121aa7-470a-4176-9769-0be572e8eb71")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/e738bac3-db1d-5891-9997-19fb91fcf9c2")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -13422,6 +14502,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2286"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1236898d-7526-4702-a634-3048833b2c5b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KENTO KT-0603R"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "da44d767-888e-45fe-8069-c2e7e6129c23")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -13624,6 +14728,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7d69eed5-93e2-4419-a365-b5a0edd16768")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "75f3a8bc-7b27-4d75-99bb-05ec1894d5ee")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/1eccf6be-f6ee-5da9-ad09-d3e3a9757d5a")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -13769,6 +14897,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e416b0c2-35dc-47e8-ac9a-9d4f2767ee3d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5466c84d-7204-41e4-86b4-d123f2b1a864")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -13927,6 +15079,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "751d50dc-5454-482c-8a2a-4e9bb3e5b4d2")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C84681"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "498a6ce3-d79d-4185-bc18-20cbfcd5675c")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14350,6 +15514,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "70d302c7-b32b-4ef8-9d08-99537c88c5fd")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "4ca298c6-efdb-458f-b451-c21d1c1609d4")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/e4e9a257-1d7f-5ed8-89f1-76d2fcf2f0c7")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -14499,11 +15687,23 @@
 				)
 			)
 		)
-		(property "MPN" "Phoenix MKDS 1,5/3-5,08 (1715734)"
+		(property "MPN" "Phoenix MKDS 1,5/ 3-5,08 (1715734)"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d78eead3-201e-4ec3-b16a-f339f82a70b6")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C480520"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "844047aa-785d-4407-9955-8021d7ecd6e1")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14910,6 +16110,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C1524672"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8e9d5ac8-2166-483e-a084-22375e2e812b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/c0f8ed77-dff2-566e-b1e7-5937ae297ef2")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -15252,6 +16464,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C5484501"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ec1df2df-16e2-4b4d-b8c8-98d764d027ca")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Phoenix PT 1,5/ 8-3,5-H (1984675)"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a4aa4973-4415-434a-a2de-f45524847c80")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -15835,6 +17071,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C83329"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "23c9c95b-5eb6-490a-89ee-60d014d7c575")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/a7a8beb5-61f7-54ad-b63d-6b6ce88c56a6")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -16112,6 +17360,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b7db8199-5284-43e1-9974-898242a0c63e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fd105fe7-6e85-4e15-a6dc-5947e811b71d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/9aaa2475-a4eb-5230-8476-e8dd6e747b8e")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -16257,6 +17529,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7b7d4eb8-957c-47af-9b96-8197f032b5bb")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3bb3a8c1-389f-4510-b5a0-ffc10fc4259e")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -16410,6 +17706,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a15a6cd3-b5ba-4e54-8106-33fa370db576")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "91a4c707-dba1-49ee-9486-1aa87d270b55")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/909f695b-6459-5dc7-8f90-bdcc40e63108")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -16555,6 +17875,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "bd6f2e48-55e6-4f4a-ae3e-f9d8e5944658")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "987c3663-5b15-496d-8f2d-bc188eead8f7")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -16708,6 +18052,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "38d152f5-7ae5-42dc-bcb1-17f461153596")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "407ad796-08d9-4a33-9c9d-7ba064ff9a86")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/f1f37465-05eb-579c-9fb0-88aba9545f44")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -16857,6 +18225,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a8965f72-c864-44c1-a690-1b795c99020d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e2a47497-5ef1-4c11-88e7-31173bb16673")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/d5e5a8ee-04c9-572f-9bbc-738df555b724")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -17002,6 +18394,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C5144867"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e3ff5757-1966-4179-bffe-1dfb7d9a78de")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Phoenix PT 1,5/ 4-3,5-H (1984633)"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "81008adf-c1c8-4059-8afc-892e129d86fb")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -17421,11 +18837,23 @@
 				)
 			)
 		)
-		(property "MPN" "JST SM04B-SRSS-TB"
+		(property "MPN" "JST SM04B-SRSS-TB(LF)(SN)"
 			(at 0 0 180)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "f87208b9-a730-4aa9-a5ac-7ddbe2d3f66a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C160404"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c5eb1c3d-d4de-4cca-9c04-d7284bff34d6")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17850,6 +19278,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C15850"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "01312c7c-fcab-4b4a-ac53-7ccf73616416")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Samsung CL21A106KAYNNNE"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0e7131c6-978a-4379-833c-8019fa96125e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/be47a995-fe74-5ef8-b8a9-0322515bd8b7")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -18011,6 +19463,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C89648"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2343f625-eada-4bfd-a816-73c30b8da76d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/ef87b666-5ba4-5cda-afe1-b8f301725750")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -18156,6 +19620,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0fba671c-d7f9-4bcb-a7f6-638dba45c1a8")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1003T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "94e4e425-261e-426a-8935-9f752cce20cb")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -18309,6 +19797,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5fcc68d7-253e-4ce2-87ce-01091fb4472f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "511fc525-ac24-40e0-9783-b82a3eeb06e0")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/ab1343d9-0481-5123-b165-140a5a846837")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -18454,6 +19966,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C23186"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "24a4f54f-2b38-4398-b8b0-f2a951c8cd9b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF5101T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2b479cd6-2b87-4e51-9140-e150cf8d116d")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -18607,6 +20143,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d0a20ce6-b9d1-414a-8be5-2163bc3c1908")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1f18a64c-6786-46a6-a18b-e31371c46967")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/cb0ebbdf-4845-5d9d-8b27-96bde7baac07")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -18752,6 +20312,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5da2539e-c255-42d9-ad0c-2b83116608b5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "f09ce1b0-918a-4386-9a5c-4d07714698d4")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -18905,6 +20489,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C22984"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8e109d16-2751-4fd7-8431-fa186ddd1745")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF3002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fb93f3e0-1bde-43ab-9280-07846f802a26")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/8c9d2207-5c4a-52c3-9a03-7f3a8c7d0b54")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -19054,11 +20662,23 @@
 				)
 			)
 		)
-		(property "MPN" "Bourns MF-MSMF020-2"
+		(property "MPN" "Bourns MF-NSMF020-2"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "54bce942-1dcb-446a-9d2c-419da6acae54")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C185112"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c161ba97-5709-4db5-9658-79aba1da93a8")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19215,6 +20835,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C23186"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a9ffa7cb-e5ff-4e4e-874b-376c9cfa9024")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF5101T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5e21f14f-743b-4d54-8665-6efcb0b28765")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/dc725063-7ad3-533c-810c-a9bd0cd5b1d7")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -19359,6 +21003,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "ce908644-5104-4941-9c79-b9a4aaecdc9d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C19591980"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "9f4cdb43-470c-4f0a-acff-ea7d72acc382")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -19570,6 +21226,18 @@
 				)
 			)
 		)
+		(property "LCSC" "C19591980"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "fa6fabe8-954f-4ac4-9fd5-abaa2fead521")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/32dce2d4-f149-5127-a4b2-fb7865a126ae")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -19768,6 +21436,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2286"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ee740eae-006c-4fdc-a8c4-3049c17f0bce")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KENTO KT-0603R"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "34dc0269-99b5-46ba-88b1-26665fc76b2b")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -20076,6 +21768,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5d5eb498-3f5f-437f-bcf5-0f42790f6016")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "22e036dc-3f6f-4c1f-afdd-9ef96e17a261")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/1f868b0e-0891-583a-9180-62720482685b")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -20225,6 +21941,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C23162"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8e3c6cc2-04b1-4e05-bc9c-ddaeb3026e37")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF4701T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "75a2bcb9-2eb8-4550-8b75-792ba60bf2b5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/cffdaf52-43fe-5df4-bbdd-1ff01d22d106")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -20370,6 +22110,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C20917"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3dd16834-cbd3-4255-9ce2-794cc4b570d8")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "AOS AO3400A"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e8980e66-160a-46c8-873c-836766757286")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -20743,6 +22507,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25803"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3922d269-ed85-41d7-b6ef-e4a9d09621aa")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1003T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "740b7f6f-3c90-46b3-bb97-d0880bcd7d6e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/3056d877-60e9-57ac-9ecb-36b5ac017350")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -20892,6 +22680,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "06be587e-fb69-490b-a3f3-bdce05d4169b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "c555e65b-b7b2-46f1-965f-64d2381ec0f5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/f7cc14d2-623f-5b18-a76b-c2278a4918d6")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -21037,6 +22849,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C20526"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "dd5d2dac-6b4c-4890-86ee-faeb5dbe99ba")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "MMBT3904"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "14938853-29a0-4fc1-8a3a-17f4f3654bcd")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -21365,7 +23201,7 @@
 				)
 			)
 		)
-		(property "Value" "100u 10V"
+		(property "Value" "100u 16V"
 			(at 0 4.35 0)
 			(layer "F.Fab")
 			(uuid "87fbf161-d7e5-47d1-9d9d-b554f11fa15b")
@@ -21406,6 +23242,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2887276"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "5fe26ecf-18b1-4fc1-a0bf-07ea80c5975d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KNSCHA RVT100UF16V67RV0016"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e0d4cbda-f243-403a-b3f7-62489740e4db")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -21848,6 +23708,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C23162"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e25881f6-f4b9-4b65-a008-ad5f4b449188")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF4701T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8cfdaadd-cf8b-4a6b-9b3b-2b1f3689afe6")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/fdfe65ce-4418-55c8-ada6-1c8af2be48db")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -21993,6 +23877,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ab91412a-e328-415b-a76a-e189b5e2ff57")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1001T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2653460f-7ec9-47e4-8cab-a1f39dfb29e1")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -22146,6 +24054,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C25804"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a288312b-b5cd-4dad-996c-97a127904d3a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1002T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6641bf45-0450-42fb-b1e5-ed3cfd3f8d02")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/1e268300-ff82-511d-8a79-4eaf21edfca8")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -22295,11 +24227,23 @@
 				)
 			)
 		)
-		(property "MPN" "Phoenix MKDS 1,5/3-5,08 (1715734)"
+		(property "MPN" "Phoenix MKDS 1,5/ 3-5,08 (1715734)"
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "e20296c3-b6e0-4348-b7da-cd7ff6ac694f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C480520"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "98eb9127-c61f-4f53-a415-50ff978dad6c")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -22702,6 +24646,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C2286"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0013f1b9-676a-4f45-ba81-7966299e378b")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "KENTO KT-0603R"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e91cbf91-9828-45b6-9f81-bfe046657f49")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/3aafc2eb-e10e-5d85-8219-7fbaed478e10")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -22896,6 +24864,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C47546"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e606d651-a39e-4af8-b674-1f4acc357b4e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Nexperia BAT54S,215"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e4cf81ac-6f82-4ce9-87e0-8566634b6f87")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -23267,6 +25259,18 @@
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "259cee3f-c4c0-427c-8c95-0418859c0c3a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C701341"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e130665a-7108-4b3a-bb8e-8f029e66afa7")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -24091,6 +26095,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C20526"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "ddaa7492-3d9e-402f-bffd-7a9d0655efa2")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "MMBT3904"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "2a2e9ed5-ee7c-42a9-ac63-1b75039065c0")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/7a1e0e6b-8110-5431-adb9-f0b4c825d546")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -24460,6 +26488,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C21190"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "9431ee06-f057-4d15-a1d6-1725bfc7fba6")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1001T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "af8c5052-8327-49fa-b5b4-06cfa6c18aa7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/322767dc-c9de-56db-8827-a3275759e637")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -24605,6 +26657,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C23162"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "653338b5-1897-4851-9838-9e7493e69f49")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF4701T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "044ebf3c-ef5f-41c0-80a3-40de2b79466a")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -24758,6 +26834,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b8084bca-bf12-4879-8706-d4a9e5965d90")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "7d934b03-5336-4f76-8c54-335af7bb33d2")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/d769514e-bc15-5f07-9a52-0d45b660188f")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -24903,6 +27003,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C21190"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3004801a-b3f4-48c4-a239-3f9948790479")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1001T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3a2cd09b-02ab-4c1a-b9e2-18012ca828f7")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -25056,6 +27180,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C21190"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d2543199-ba25-48f0-a8e4-a1beda6e7d66")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1001T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d76e36cd-1729-40d5-b438-3b6296af0cdb")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/9b5b7bf1-d13d-56a8-86f3-6b0b8e6140c6")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -25205,6 +27353,30 @@
 				)
 			)
 		)
+		(property "LCSC" "C14663"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "251803a8-a92b-4076-b835-bf33312c8e37")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Yageo CC0603KRX7R9BB104"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "37c8c6fe-32e8-492d-8259-4c34d42a1973")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
 		(path "/2b2b5d8f-54eb-5d76-84b2-aab3a22b00aa/ee83ebea-76a5-54db-a941-4a24956cf336")
 		(sheetname "Root")
 		(sheetfile "MB-1.kicad_sch")
@@ -25350,6 +27522,30 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C22775"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8c86e182-c0cb-4430-8382-6aa87bff64ac")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "MPN" "Uniroyal 0603WAF1000T5E"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "846f470a-f174-4476-ae36-c701347e444c")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -25528,7 +27724,7 @@
 	(gr_text "RESET"
 		(at 105 90 0)
 		(layer "F.SilkS")
-		(uuid "92f71ab7-344d-4873-bd2e-aa59a7a2fd7e")
+		(uuid "9002bb46-98db-4907-a755-3a12f4fa5f8d")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25539,7 +27735,7 @@
 	(gr_text "BOOT"
 		(at 105 98.5 0)
 		(layer "F.SilkS")
-		(uuid "98850e47-8360-4855-b0b5-b6f89af59ffc")
+		(uuid "111484ca-855f-484c-861d-d63e72087e2f")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25550,7 +27746,7 @@
 	(gr_text "GND"
 		(at 110.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "de5f0ff2-ef43-42da-9095-c671c6af0521")
+		(uuid "b76282c0-1ac8-452a-a170-8c7f37578db9")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25561,7 +27757,7 @@
 	(gr_text "SCL"
 		(at 113.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "7f70bd83-1b24-4570-965f-511420e27b9c")
+		(uuid "da75db38-572e-4acf-ba39-4af1930eea0a")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25572,7 +27768,7 @@
 	(gr_text "SDA"
 		(at 117.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "e7f245f2-e53d-41fc-bf33-1b1c8e9c9f58")
+		(uuid "dd7ba1e5-820d-4695-8157-aebc166b3fd6")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25583,7 +27779,7 @@
 	(gr_text "3V3"
 		(at 120.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "df872c8b-9b09-4673-9b78-c79254486672")
+		(uuid "bf1ef8f4-d71d-4766-9e14-bf6508256a6f")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25594,7 +27790,7 @@
 	(gr_text "GND"
 		(at 126.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "3462b888-f972-4f2b-a82e-555ebb9c48e1")
+		(uuid "a1e92032-491a-4ab0-ba16-c1f6a92df860")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25605,7 +27801,7 @@
 	(gr_text "DQ"
 		(at 129.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "940ab01f-1759-4705-93ed-c79fcb303f64")
+		(uuid "b55806a0-bf51-4852-abe5-56498f6ae2d8")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25616,7 +27812,7 @@
 	(gr_text "3V3"
 		(at 133.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "ac4aa51e-48bd-4e18-b001-7c3f9c91bff3")
+		(uuid "b4300fbc-69d4-4329-9b2a-1c46a763de5e")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25627,7 +27823,7 @@
 	(gr_text "GND"
 		(at 138.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "3c5eaf76-a0dd-4e38-a7bb-b191bf68159b")
+		(uuid "01f65a80-aa08-4e4e-b64d-0f706cde914a")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25638,7 +27834,7 @@
 	(gr_text "GND"
 		(at 141.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "7f61937f-659b-42e1-abc1-ee621db2fc3b")
+		(uuid "8129f386-64da-4339-b395-1075126f2e20")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25649,7 +27845,7 @@
 	(gr_text "AI6"
 		(at 145.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "e5e2ab30-b602-4a30-b946-2245045fe55a")
+		(uuid "95c211e6-0f0f-4b97-9c85-b1ac29b0c640")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25660,7 +27856,7 @@
 	(gr_text "AI5"
 		(at 148.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "b31c31b8-e687-4afe-8653-94ccf58f4132")
+		(uuid "f908bb4d-245a-4419-9e67-849788c7934d")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25671,7 +27867,7 @@
 	(gr_text "AI4"
 		(at 152.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "4d5485b5-e277-4999-aa44-bfb5c03fdad3")
+		(uuid "281f7827-cba1-4111-9ff8-bb6c8f75c422")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25682,7 +27878,7 @@
 	(gr_text "AI3"
 		(at 155.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "fdd691f3-16c7-491a-ada3-0d1b4a0a0799")
+		(uuid "98f5f200-b891-40ff-9dd7-653ec60994f3")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25693,7 +27889,7 @@
 	(gr_text "AI2"
 		(at 159.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "5d9fd36b-5015-4031-b210-9a487ff51071")
+		(uuid "0f9d3c72-f4ce-42da-8ca0-30a655cc34a9")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25704,7 +27900,7 @@
 	(gr_text "AI1"
 		(at 162.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "bef81ec6-fa7d-4fab-815a-5f225248be7e")
+		(uuid "fc5b756c-ddbd-4735-b69a-0a3ad99fd25f")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25715,7 +27911,7 @@
 	(gr_text "GND"
 		(at 167.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "bbe5cc1f-f057-477e-b9c6-a4f6d652264f")
+		(uuid "561891ce-1074-4879-807c-e53b59fa1195")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25726,7 +27922,7 @@
 	(gr_text "3V3"
 		(at 171.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "c54f6885-0a8b-4d29-8b67-d31b82668896")
+		(uuid "7ef02527-c482-4c9c-b56c-cfdf17f45073")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25737,7 +27933,7 @@
 	(gr_text "IO6"
 		(at 174.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "bb71464e-9538-4f64-9b60-a95081c9f304")
+		(uuid "e2625edc-b243-46cd-af3a-0fc743ed0cf6")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25748,7 +27944,7 @@
 	(gr_text "IO5"
 		(at 178.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "825b8124-18bc-4d9c-ab8d-b84dd10fd209")
+		(uuid "31ec7b83-d30c-4f11-bf59-76e7ed0f80c8")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25759,7 +27955,7 @@
 	(gr_text "IO4"
 		(at 181.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "f0578483-adf9-4330-8f8a-8c036ef46950")
+		(uuid "82d6d412-2091-40cb-b3c4-f02b807edea9")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25770,7 +27966,7 @@
 	(gr_text "IO3"
 		(at 185.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "94ce1ce6-ead9-4b4c-b883-7e2c6c130064")
+		(uuid "6dc93c04-3541-491b-91d4-b766b8ad775b")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25781,7 +27977,7 @@
 	(gr_text "IO2"
 		(at 188.8 60.6 90)
 		(layer "F.SilkS")
-		(uuid "0c9c8123-9370-42ee-8280-41b0422f11ce")
+		(uuid "7a0e078a-1bad-4a57-8470-413f3183f2f6")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25792,7 +27988,7 @@
 	(gr_text "IO1"
 		(at 192.3 60.6 90)
 		(layer "F.SilkS")
-		(uuid "33cb03d5-17ea-41a6-a6e0-d3d770282c9a")
+		(uuid "8549bf36-08c5-47de-b662-98ec6aaf4b5e")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -25803,7 +27999,7 @@
 	(gr_text "USB"
 		(at 104.5 72.5 0)
 		(layer "F.SilkS")
-		(uuid "8ebdea7f-9944-4654-9ee5-acc772b879f8")
+		(uuid "c265fa53-ee12-4b02-82e8-cb481f62e381")
 		(effects
 			(font
 				(size 1 1)
@@ -25814,7 +28010,7 @@
 	(gr_text "COM"
 		(at 112 138 0)
 		(layer "F.SilkS")
-		(uuid "c3de7018-2a9a-4225-8fd6-596f6fd3014b")
+		(uuid "6fcd9d67-6f41-4a17-91dd-1643d7adbb99")
 		(effects
 			(font
 				(size 1 1)
@@ -25825,7 +28021,7 @@
 	(gr_text "NO"
 		(at 117.08 138 0)
 		(layer "F.SilkS")
-		(uuid "7629459e-ca45-4212-a757-757e6f0c4c5d")
+		(uuid "5f33c7b1-46e2-4324-bdb3-29b565ffdd7c")
 		(effects
 			(font
 				(size 1 1)
@@ -25836,7 +28032,7 @@
 	(gr_text "NC"
 		(at 122.16 138 0)
 		(layer "F.SilkS")
-		(uuid "665d37ac-0e7f-45c0-a1be-49e5dcf9b980")
+		(uuid "97a042c9-6867-46a0-ba6e-bd3e9262d772")
 		(effects
 			(font
 				(size 1 1)
@@ -25847,7 +28043,7 @@
 	(gr_text "COM"
 		(at 131 138 0)
 		(layer "F.SilkS")
-		(uuid "081d16b9-d652-4e52-a229-76324ea8c44e")
+		(uuid "bb59c755-c151-42c1-9d01-9cad3d68e4ca")
 		(effects
 			(font
 				(size 1 1)
@@ -25858,7 +28054,7 @@
 	(gr_text "NO"
 		(at 136.079999 138 0)
 		(layer "F.SilkS")
-		(uuid "660baccf-8d0e-4cea-a5d9-b138b2b3c285")
+		(uuid "f956abc6-a5f4-4e0e-9fb3-db2c286443a8")
 		(effects
 			(font
 				(size 1 1)
@@ -25869,7 +28065,7 @@
 	(gr_text "NC"
 		(at 141.16 138 0)
 		(layer "F.SilkS")
-		(uuid "5537f74a-082f-4cd1-a32b-3ff490a186c0")
+		(uuid "c4e1a222-38a6-44ad-8818-7ee3b33e13a2")
 		(effects
 			(font
 				(size 1 1)
@@ -25880,7 +28076,7 @@
 	(gr_text "L"
 		(at 184 138 0)
 		(layer "F.SilkS")
-		(uuid "206361b3-ca14-4a9d-a656-04a8f6475942")
+		(uuid "4f332476-a8df-43cf-9750-e694cc1f62f8")
 		(effects
 			(font
 				(size 1 1)
@@ -25891,7 +28087,7 @@
 	(gr_text "2 A AC only"
 		(at 189 129 0)
 		(layer "F.SilkS")
-		(uuid "2d855237-1872-42b0-845e-76e2f29f482a")
+		(uuid "d0f94fcc-8ba4-4361-a0ff-000412e4a157")
 		(effects
 			(font
 				(size 1 1)
@@ -25902,7 +28098,7 @@
 	(gr_text "R3"
 		(at 189.079999 138 0)
 		(layer "F.SilkS")
-		(uuid "dc0a43b8-0eff-4544-8304-b7a125282e5a")
+		(uuid "9c302fbf-b7e6-44e0-b114-8ce598b5be5e")
 		(effects
 			(font
 				(size 1 1)
@@ -25913,7 +28109,7 @@
 	(gr_text "R4"
 		(at 194.16 138 0)
 		(layer "F.SilkS")
-		(uuid "b38a0e98-b202-49b5-9bf8-7897ee32d854")
+		(uuid "cf1c600c-c622-447c-bd85-4dddb76028a3")
 		(effects
 			(font
 				(size 1 1)
@@ -25924,7 +28120,7 @@
 	(gr_text "R1"
 		(at 107 138 0)
 		(layer "F.SilkS")
-		(uuid "f4025cc7-e8ac-400d-95c8-12711305469f")
+		(uuid "0f82f746-b07b-4bde-862b-5c9e97dbf02f")
 		(effects
 			(font
 				(size 1.2 1.2)
@@ -25935,7 +28131,7 @@
 	(gr_text "R2"
 		(at 126.4 138 0)
 		(layer "F.SilkS")
-		(uuid "62a8d864-d197-4b5f-a0a6-b55e20f0573a")
+		(uuid "434f5d27-517d-4e7b-a059-fe31adac8e71")
 		(effects
 			(font
 				(size 1.2 1.2)
@@ -25946,7 +28142,7 @@
 	(gr_text "R3/R4 SSR"
 		(at 189 127 0)
 		(layer "F.SilkS")
-		(uuid "c24b12b5-ab5f-4e62-b780-2b16a27803e9")
+		(uuid "a4c1fbe5-82f0-41d2-a848-8c6e82253013")
 		(effects
 			(font
 				(size 1.2 1.2)
@@ -25957,7 +28153,7 @@
 	(gr_text "MB-1 rev A  EspressOS"
 		(at 199 113 0)
 		(layer "F.SilkS")
-		(uuid "762d47f2-3e10-45cd-915e-693e9158b981")
+		(uuid "d0c21f8d-c37b-41dc-ae3c-f251841a2957")
 		(effects
 			(font
 				(size 1.2 1.2)
@@ -25968,7 +28164,7 @@
 	(gr_text "MAINS 230 V"
 		(at 151 128 0)
 		(layer "F.SilkS")
-		(uuid "01d2a6ff-3879-47cc-86bf-70b6bafc7675")
+		(uuid "7cecb6ef-3669-4047-9342-6313f5d5a206")
 		(effects
 			(font
 				(size 1.5 1.5)

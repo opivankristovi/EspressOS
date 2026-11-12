@@ -401,10 +401,16 @@ def main():
 
 
 if __name__ == '__main__':
-    if '--silk' in sys.argv:  # relabel the routed board in place
+    if '--silk' in sys.argv:  # part fields and silkscreen on the routed board, in place (no copper changes)
         b = pcbnew.LoadBoard(PCB)
+        for p in g.PARTS:
+            if not p['sym'].startswith('power:'):
+                fp = b.FindFootprintByReference(p['ref'])
+                fp.SetValue(p['value'])
+                for k, v in p['fields'].items():
+                    fp.SetField(k, v)
         silkscreen(b)
         pcbnew.SaveBoard(PCB, b)
-        print('silkscreen updated:', PCB)
+        print('fields and silkscreen updated:', PCB)
     else:
         main()
