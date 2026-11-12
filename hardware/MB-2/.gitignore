@@ -1,0 +1,6 @@
+# Check outputs (kicad-cli)
+MB-2.net
+erc.rpt
+*-backups/
+fp-info-cache
+__pycache__/
