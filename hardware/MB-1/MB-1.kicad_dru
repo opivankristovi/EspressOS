@@ -1,0 +1,21 @@
+(version 1)
+
+# Mains copper keeps 6 mm from low-voltage copper (reinforced insulation, 230 V).
+(rule "Mains to low voltage"
+  (constraint clearance (min 6mm))
+  (condition "A.NetClass == 'Mains' && B.NetClass != 'Mains' && B.Type != 'Hole'"))
+
+# Different mains circuits (functional insulation).
+(rule "Mains to mains"
+  (constraint clearance (min 2.0mm))
+  (condition "A.NetClass == 'Mains' && B.NetClass == 'Mains'"))
+
+# Inside one SSR or relay the part's own pin spacing applies.
+(rule "Inside SSR and relay"
+  (constraint clearance (min 1.5mm))
+  (condition "A.NetClass == 'Mains' && B.NetClass == 'Mains' && A.memberOfFootprint('K*') && B.memberOfFootprint('K*')"))
+
+# Mounting screws: 6 mm from mains copper.
+(rule "Mains to holes"
+  (constraint hole_clearance (min 6mm))
+  (condition "A.NetClass == 'Mains' && B.Type == 'Hole' && B.Pad_Type == 'NPTH, mechanical'"))

@@ -1,8 +1,8 @@
 # MB-1: 6 analog in, 2 relays, 2 SSRs (rev A, design)
 
-MB-1 is a DIN-rail carrier board for an ESP32-WROOM-32E module. It is the hardware that the `eos-mb1` board profile in [web/js/boards.js](../../web/js/boards.js) describes. This document is the design: decisions, block diagram, pin map, terminal layout, circuits with values, the KiCad schematic, a BOM and layout rules.
+MB-1 is a 120 × 100 mm carrier board for an ESP32-WROOM-32E module. It is the hardware that the `eos-mb1` board profile in [web/js/boards.js](../../web/js/boards.js) describes. This document is the design: decisions, block diagram, pin map, terminal layout, circuits with values, the KiCad schematic and PCB, a BOM and layout rules.
 
-**Status:** schematic done (generated, netlist-checked). There is no PCB layout yet, and nothing has been ordered or built.
+**Status:** schematic done (generated, netlist-checked). PCB placed and routed (generated; DRC: no errors). Nothing has been ordered or built.
 
 ## Design decisions
 
@@ -13,7 +13,7 @@ MB-1 is a DIN-rail carrier board for an ESP32-WROOM-32E module. It is the hardwa
 | Outputs | R1, R2: mechanical relays with NO and NC contacts. R3, R4: Omron G3MB-202P solid-state relays | Relays switch AC or DC and have a changeover contact. The SSRs switch AC silently and often (heaters, pumps). |
 | Analog in | 6 × 0–10 V | The industrial standard; the same terminals also work as 12–24 V digital inputs. |
 | Build | JLCPCB SMD assembly; through-hole parts (terminals, relays, SSRs, fuse holders) soldered by hand | |
-| Enclosure | 6-module DIN-rail case, for example Camdenboss CNMB/6/KIT | Check the internal PCB size against the case drawing before layout. |
+| Enclosure | None: a bare board, 120 × 100 mm, five M3 holes | A 6-module DIN case (Camdenboss CNMB/6) has room for only 12 terminal poles per row at 3.5 mm and 9 at 5.08 mm; MB-1 needs 23 and 8. Mount it on standoffs inside a closed cabinet. |
 
 > **Mains warning.** The relay contacts and the SSRs carry mains voltage on this PCB. Wiring and layout have to follow the creepage rules below. The board belongs in a closed enclosure, behind an upstream circuit breaker. Mains work must be done by someone qualified to do it.
 
@@ -67,17 +67,17 @@ flowchart LR
 
 ## Terminals
 
-Mains is on the lower edge (5.08 mm pitch, rated 250 V). Safety extra-low voltage (SELV) is on the upper edge (3.5 mm pitch). USB-C is on the upper edge too.
+Mains is on the lower edge (5.08 mm pitch, rated 250 V). Safety extra-low voltage (SELV) is on the upper edge (3.5 mm pitch). USB-C and the RESET and BOOT buttons are on the left edge.
 
 **Upper edge (SELV), left to right**
 
 | Block | Positions |
 |---|---|
-| USB-C | power and programming |
+| I2C (4) | 3V3 · SDA · SCL · GND |
+| 1-Wire (3) | 3V3 · DQ · GND |
 | Analog (8) | AI1 · AI2 · AI3 · AI4 · AI5 · AI6 · GND · GND |
 | GPIO (8) | IO1 · IO2 · IO3 · IO4 · IO5 · IO6 · 3V3 · GND |
-| 1-Wire (3) | 3V3 · DQ · GND |
-| I2C (4) | 3V3 · SDA · SCL · GND, plus a Qwiic/STEMMA QT socket beside it |
+| Qwiic | Qwiic/STEMMA QT socket, at the right end |
 
 **Lower edge (mains), left to right**
 
@@ -85,8 +85,9 @@ Mains is on the lower edge (5.08 mm pitch, rated 250 V). Safety extra-low voltag
 |---|---|---|
 | R1 (3) | COM · NO · NC | 250 V AC / 30 V DC, 5 A (derated from the relay's 10 A for PCB and terminals) |
 | R2 (3) | COM · NO · NC | same |
-| R3 (2) | L in · Load | 100–240 V AC, 0.1–2 A, AC only; 2 A fuse on board |
-| R4 (2) | L in · Load | same |
+| R3, R4 (3) | SSR L in · R3 Load · R4 Load | 100–240 V AC, 0.1–2 A each, AC only; a 2 A fuse per SSR on board |
+
+The two SSRs share one L input (J4 pin 1); each has its own fuse after that terminal. Wire both loads from the same phase.
 
 The 3V3 terminal positions share a 200 mA PTC, so a shorted sensor cable cannot reset the ESP32.
 
@@ -117,8 +118,8 @@ The 3V3 terminal positions share a 200 mA PTC, so a shorted sensor cable cannot 
 Each output is a low-side N-MOSFET with its gate held low, so the output is off while the ESP32 boots (GPIO 16–19 float at reset).
 
 - GPIO → Rg(n) 100 Ω → gate Qn (AO3400A). Rpd(n) 100 kΩ from gate to GND.
-- **R1, R2 (relays K1, K2, HF3FF/005-1ZS):** coil between 5V and the drain. Flyback diode D(n) 1N4148W across the coil (cathode to 5V). Indicator LED + 1 kΩ from 5V to the drain.
-- **R3, R4 (SSRs K3, K4, G3MB-202P):** input + to 5V, input − to the drain. Indicator LED + 1 kΩ from 5V to the drain. Load side: terminal "L in" → fuse F3/F4 (2 A time-lag, TR5) → SSR terminal; the other SSR terminal goes to terminal "Load". Pin order from the Omron data sheet: 1 and 2 load, 3 input +, 4 input −.
+- **R1, R2 (relays K1, K2, Omron G2RL-1 DC5):** coil between 5V and the drain. Flyback diode D(n) 1N4148W across the coil (cathode to 5V). Indicator LED + 1 kΩ from 5V to the drain.
+- **R3, R4 (SSRs K3, K4, G3MB-202P):** input + to 5V, input − to the drain. Indicator LED + 1 kΩ from 5V to the drain. Load side: terminal "SSR L in" (shared) → fuse F3/F4 (2 A time-lag, TR5) → SSR terminal; the other SSR terminal goes to terminal "R3 Load" / "R4 Load". Pin order from the Omron data sheet: 1 and 2 load, 3 input +, 4 input −.
 - G3MB-202P notes for the user:
   - It switches AC only; it never turns a DC load off.
   - Its built-in snubber passes a small leakage current, so a very small load such as an LED lamp under about 0.1 A can glow while the output is off. The profile note says 0.1–2 A for that reason.
@@ -160,14 +161,15 @@ python check_netlist.py MB-1.net
 kicad-cli sch export pdf -o MB-1.pdf MB-1.kicad_sch
 ```
 
-[check_netlist.py](check_netlist.py) compares the netlist KiCad reads from the sheet with the nets in the script, pin by pin. A label that lands on the wrong pin would short or split a net without any ERC error. The current sheet gives 73 nets and 0 differences.
+[check_netlist.py](check_netlist.py) compares the netlist KiCad reads from the sheet with the nets in the script, pin by pin. A label that lands on the wrong pin would short or split a net without any ERC error. The current sheet gives 72 nets and 0 differences.
 
 **ERC:** the electrical check has one expected error: "power output connected to power output" between U2 VO and U3 V3. The CH340C datasheet ties V3 to VCC when the chip runs at 3.3 V. Exclude it in KiCad's ERC dialog. On a KiCad install whose library tables were never set up, `kicad-cli` also lists "library not in the current configuration" warnings; those go away once KiCad has been started once.
 
-**Before the PCB:**
+**Parts that needed care:**
 - *K3/K4 symbol:* KiCad has no Omron G3MB. The sheet uses the Sharp S202S02 symbol, which does the same job: input 3 (+) and 4 (−), output 1 and 2.
 - *K3/K4 footprint:* `MB-1:Omron_G3MB-202P_SIP4` lives in the project library [MB-1.pretty](MB-1.pretty), drawn from Omron's G3MB data sheet (Cat. No. GC RLY8, page 3). It has four 1.0 mm holes on 1.8 mm pads, at 0, 7.62, 17.78 and 20.32 mm from pin 1 (top view). Pins 1 and 2 are the load and 3 (+) and 4 (−) the input. The body is 24.5 × 5.5 mm, with pin 4 1.69 mm from the body end. The [fp-lib-table](fp-lib-table) next to the project points KiCad to it. This is the standard G3MB-202P only: the "-4" variant has a different hole layout.
 - *F3/F4:* these use TR5 fuse sockets (Littelfuse 560/460 series), so a blown fuse can be swapped.
+- *K1/K2:* Omron G2RL-1 rather than the common HF3FF/SRD cube: on the cube footprint COM sits 6.3 mm from a coil pin, which leaves no room for 6 mm creepage after pads. The G2RL has its coil and contacts at opposite ends (KiCad footprint `Relay_THT:Relay_SPDT_Omron_G2RL-1`).
 
 Reference designators on the sheet:
 
@@ -179,6 +181,41 @@ Reference designators on the sheet:
 | Outputs (n = 1…4) | gate resistor R11–R14, gate pull-down R15–R18, MOSFET Q3–Q6, LED2–LED5 with R19–R22, relays K1/K2 with flyback D4/D5, SSRs K3/K4 with fuses F3/F4, terminals J2–J4 |
 | Analog in (n = 1…6) | series R23–R28 (30k), to GND R29–R34 (10k), C11–C16, clamp D6–D11, terminal J6 |
 | GPIO, buses | series R35–R40, ESD U5/U6 and D3, I2C pull-ups R8/R9, 1-Wire pull-up R10, PTC F2, terminals J7–J9, Qwiic J5 |
+
+## PCB
+
+[MB-1.kicad\_pcb](MB-1.kicad_pcb): two layers, 120 × 100 mm, all parts on top. Renders: [top](MB-1-top.png), [bottom](MB-1-bottom.png). Like the schematic it is generated, and then routed by a script:
+
+```bash
+"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" gen_pcb.py
+"%LOCALAPPDATA%\Programs\KiCad.0in\python.exe" route.py
+kicad-cli pcb drc MB-1.kicad_pcb
+```
+
+* **[gen\_pcb.py](gen_pcb.py)** reads the parts and nets from `gen_schematic.py`, places every footprint, and writes the outline, mounting holes, silkscreen labels, ground pours and design rules. Footprints keep their schematic links, so *Update PCB from Schematic* in KiCad still works. Ground pads that tracks would fence in (U4, U5, U6, the AI filter caps, each output driver's MOSFET source and gate pull-down) get a locked via before routing. Strips 0.5 mm wide along the board edge keep tracks off it. `gen_pcb.py --silk` redoes only the silkscreen on the routed board.
+* **[route.py](route.py)** exports the board to Freerouting, routes it (about 15 minutes), reads the result back and cleans up after it: it removes loose vias and dead-end stubs, fills the pours, adds ground stitching vias on a 4 mm grid (0.5 mm from any other hole), joins every piece of ground pour that is cut off from the main ground with a via, and widens the few tracks Freerouting necks below 0.13 mm. Freerouting's router is deterministic and can stall with a net open; route.py then retries with a slightly larger clearance margin. It needs the Freerouting 2.5 jar (from its GitHub releases) and Java 25; the native `freerouting-cli` 2.5.0 build crashes and then hangs. Freerouting's log goes to `MB-1.route.log`.
+
+**Layout.** SELV parts fill the top 65 mm: terminals along the top edge, the ESP32 at the right edge with its antenna past the copper, USB-C and the power and USB-serial parts on the left, the four output drivers in a row above the keep-out. A 6 mm keep-out band across the board (y 65.6–71.6 mm) carries no copper on either layer. Below it are only mains parts: K1/K2 above J2/J3 on the left, K3/K4 with F3/F4 and J4 on the right. Relay coils and SSR inputs are the only things that bridge the band, through the parts themselves.
+
+**Rules** ([MB-1.kicad\_dru](MB-1.kicad_dru) and the net classes in the project):
+
+|Net class / rule|Clearance|Track|
+|-|-|-|
+|Default|0.2 mm|0.25 mm|
+|Power (GND, +5V, +3V3, VBUS, 3V3 out, relay drivers)|0.2 mm|0.6 mm|
+|Mains (relay contacts, SSR load side)|2.0 mm|2.0 mm|
+|Mains to anything not mains|6.0 mm| |
+|Mains to a mounting hole|6.0 mm| |
+
+Mains tracks are 2 mm wide on both layers. That carries 5 A with about 20 °C rise on 1 oz copper; order 2 oz copper, or tin the mains tracks, if the relays will switch close to 5 A continuously.
+
+**DRC:** no errors and no unconnected items. The warnings left are "footprint library not in the current configuration" (as with ERC, until KiCad has been started once) and 8 places in the driver row where reference text touches a pad; the fab clips silkscreen off pads.
+
+**Open before ordering:**
+
+* Milled slots between relay coil and contact pins, and between SSR input and load pins (the layout rules ask for them; the 6 mm clearance already holds without them).
+* LCSC part numbers on every SMD part, then JLCPCB's BOM and CPL export.
+* A look at the board in KiCad's 3D viewer and a printout at 1:1 to check the terminal and relay footprints against real parts.
 
 ## BOM (one board)
 
@@ -193,7 +230,7 @@ Manufacturer part numbers are real parts. Look up the LCSC numbers in the JLCPCB
 | U5, U6 | 2 | 4-ch ESD, USON-10 | TI TPD4E05U06DQAR | |
 | Q1, Q2 | 2 | NPN, SOT-23 | onsemi MMBT3904 | |
 | Q3–Q6 | 4 | N-MOSFET logic level, SOT-23 | AOS AO3400A | |
-| K1, K2 | 2 | Relay SPDT 5 V, 10 A | Hongfa HF3FF/005-1ZS | Songle SRD-05VDC-SL-C fits the same footprint |
+| K1, K2 | 2 | Relay SPDT 5 V, 12 A | Omron G2RL-1 DC5 | coil and contacts at opposite ends (creepage) |
 | K3, K4 | 2 | SSR 2 A AC, zero-cross, SIP-4 | Omron G3MB-202P DC5 | |
 | F1 | 1 | PTC 1.5 A hold, 1206/1812 | Bourns MF-MSMF150-2 | |
 | F2 | 1 | PTC 0.2 A hold | Bourns MF-MSMF020-2 | |
@@ -205,14 +242,14 @@ Manufacturer part numbers are real parts. Look up the LCSC numbers in the JLCPCB
 | LED1–LED5 | 5 | 0603 LED | 1 green (power), 4 red (outputs) | |
 | J1 | 1 | USB-C 16-pin receptacle | Korean Hroparts TYPE-C-31-M-12 | |
 | J2, J3 | 2 | Screw terminal 3-pos 5.08 mm | Phoenix Contact MKDS 1,5/ 3-5,08 (1715734) | |
-| J4 | 1 | Screw terminal 4-pos 5.08 mm | Phoenix Contact MKDS 1,5/ 4-5,08 (1715747) | |
+| J4 | 1 | Screw terminal 3-pos 5.08 mm | Phoenix Contact MKDS 1,5/ 3-5,08 (1715734) | SSR L in, R3 load, R4 load |
 | J6, J7 | 2 | Screw terminal 8-pos 3.5 mm | any 3.5 mm PCB terminal (e.g. Phoenix PT 1,5 series) | |
 | J8 / J9 | 1 / 1 | Screw terminal 3-pos / 4-pos 3.5 mm | same series | |
 | J5 | 1 | Qwiic socket | JST SM04B-SRSS-TB | |
 | SW1, SW2 | 2 | Tact switch, SMD | any 6×6 or 5.1×5.1 mm | reachable from the front |
 | R | — | 0603 resistors | 5.1k ×2, 1k ×5, 10k ×4 + 6 (1 %), 30k 1 % ×6, 100R ×10, 100k ×4, 4.7k ×3 | |
 | C | — | Capacitors | 100 µF/10 V ×1 (electrolytic or 1206 ceramic), 22 µF ×2, 10 µF ×2, 1 µF ×1, 100 nF ×10 | X5R/X7R, 10 V or more |
-| Case | 1 | 6-module DIN-rail enclosure | Camdenboss CNMB/6/KIT | check the PCB outline |
+| Standoffs | 5 | M3 standoffs + screws | any | the board has no enclosure of its own |
 
 ## Layout rules
 
@@ -223,7 +260,7 @@ Manufacturer part numbers are real parts. Look up the LCSC numbers in the JLCPCB
   - Load traces at least 3 mm wide on 1 oz copper, or 2 mm on 2 oz, both layers, for 5 A.
   - No ground pour inside the mains area.
 - **SELV area:** one solid GND plane. The ESP32, the LDO and the CH340C sit away from the relay coil current loops.
-- Antenna keep-out at a board edge that faces the front window of the case, away from the relays.
+- Antenna keep-out at the right board edge, away from the relays; keep the cabinet wall near that edge non-metallic.
 - Each analog divider sits close to its ESP32 pin, with the 100 nF capacitor right at the pin.
 - Silkscreen: terminal labels exactly as the profile names them (AI1…AI6, R1…R4, IO1…IO6), plus "MB-1 rev A".
 

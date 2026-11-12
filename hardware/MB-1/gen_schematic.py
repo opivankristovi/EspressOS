@@ -128,21 +128,24 @@ for n in range(1, 5):
     part(f'LED{n + 1}', 'Device:LED', 'red', 'LED', {'2': '+5V', '1': f'LED{n + 1}_K'})
     R(f'R{18 + n}', '1k', f'LED{n + 1}_K', f'DRV{n}')
 for n in (1, 2):
-    part(f'K{n}', 'Relay:SANYOU_SRD_Form_C', 'HF3FF/005-1ZS', None,
-         {'5': '+5V', '2': f'DRV{n}', '1': f'R{n}_COM', '3': f'R{n}_NO', '4': f'R{n}_NC'},
-         MPN='Hongfa HF3FF/005-1ZS (Songle SRD-05VDC-SL-C fits)')
+    # G2RL: coil and contacts at opposite ends (8 mm creepage, reinforced insulation), so the
+    # coil side can stay 6 mm from mains copper. The SRD/HF3FF pinout has COM next to the coil.
+    part(f'K{n}', 'Relay:G2RL-1', 'G2RL-1 DC5', None,
+         {'A1': '+5V', 'A2': f'DRV{n}', '11': f'R{n}_COM', '14': f'R{n}_NO', '12': f'R{n}_NC'},
+         MPN='Omron G2RL-1 DC5')
     part(f'D{n + 3}', 'Diode:1N4148W', '1N4148W', None, {'K': '+5V', 'A': f'DRV{n}'})
 for n in (3, 4):
     # Symbol: Sharp S202S02 (same function: zero-cross triac SSR, input 3+/4-, output 1/2).
     part(f'K{n}', 'Relay_SolidState:S202S02', 'G3MB-202P DC5', 'G3MB',
          {'3': '+5V', '4': f'DRV{n}', '1': f'R{n}_LF', '2': f'R{n}_LOAD'}, MPN='Omron G3MB-202P DC5')
-    part(f'F{n}', 'Device:Fuse', '2A T', 'TR5', {'1': f'R{n}_L', '2': f'R{n}_LF'}, MPN='Littelfuse 372 series 2 A T')
+    part(f'F{n}', 'Device:Fuse', '2A T', 'TR5', {'1': 'SSR_L', '2': f'R{n}_LF'}, MPN='Littelfuse 372 series 2 A T')
 part('J2', 'Connector:Screw_Terminal_01x03', 'R1 COM/NO/NC', 'MKDS3', {'1': 'R1_COM', '2': 'R1_NO', '3': 'R1_NC'},
      MPN='Phoenix MKDS 1,5/3-5,08 (1715734)')
 part('J3', 'Connector:Screw_Terminal_01x03', 'R2 COM/NO/NC', 'MKDS3', {'1': 'R2_COM', '2': 'R2_NO', '3': 'R2_NC'},
      MPN='Phoenix MKDS 1,5/3-5,08 (1715734)')
-part('J4', 'Connector:Screw_Terminal_01x04', 'R3 L/Load, R4 L/Load', 'MKDS4',
-     {'1': 'R3_L', '2': 'R3_LOAD', '3': 'R4_L', '4': 'R4_LOAD'}, MPN='Phoenix MKDS 1,5/4-5,08 (1715747)')
+# R3 and R4 share one L in (same phase and breaker); each SSR keeps its own fuse.
+part('J4', 'Connector:Screw_Terminal_01x03', 'SSR L in, R3 load, R4 load', 'MKDS3',
+     {'1': 'SSR_L', '2': 'R3_LOAD', '3': 'R4_LOAD'}, MPN='Phoenix MKDS 1,5/3-5,08 (1715734)')
 
 # Analog inputs
 block('Analog inputs AI1-AI6: 0-10 V, 30k/10k divider (10 V = 2.5 V)', 1)
@@ -292,14 +295,23 @@ def bbox(sym):
 # --------------------------------------------------------------------- layout and output
 def snap(v, g=2.54): return round(v / g) * g
 def fmt(v): return ('%.4f' % v).rstrip('0').rstrip('.')
-def U(): return str(uuid.uuid4())
+# Stable ids: the same design gives the same file (clean diffs), and the PCB stays linked to its symbols.
+NS = uuid.UUID('6d8e2a8c-5b1f-4c7e-9a52-0e05b1c0de01')
+_count = [0]
+
+
+def U(key=None):
+    if key is None:
+        _count[0] += 1
+        key = 'item%d' % _count[0]
+    return str(uuid.uuid5(NS, key))
 
 
 SHARE = kicad_share()
 
 
 def main():
-    root = U()
+    root = U('root')
     syms, items = {}, []
     nets_seen = {}
     issues = []
@@ -350,7 +362,7 @@ def main():
                 issues.append(f'{p["ref"]}: no footprint')
             fields.update(p['fields'])
             out = [f'(symbol (lib_id {q(p["sym"])}) (at {fmt(X)} {fmt(Y)} 0) (unit 1) (exclude_from_sim no) '
-                   f'(in_bom {"no" if power else "yes"}) (on_board {"no" if power else "yes"}) (dnp no) (uuid {q(U())})']
+                   f'(in_bom {"no" if power else "yes"}) (on_board {"no" if power else "yes"}) (dnp no) (uuid {q(p.setdefault("uuid", U("sym:" + p["ref"])))})']
             for i, (k, v) in enumerate(fields.items()):
                 lp = props.get(k)
                 at = child(lp, 'at') if lp else None

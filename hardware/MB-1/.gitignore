@@ -1,0 +1,8 @@
+# Routing and check outputs (route.py, kicad-cli)
+*.dsn
+*.ses
+MB-1.route.log
+drc.rpt
+MB-1.net
+*-backups/
+fp-info-cache
